@@ -1166,7 +1166,7 @@
 
     tbody.innerHTML = filtered.map(a => `
       <tr>
-        <td><b>${a.nombre}</b><br><small style="color:var(--muted)">${a.marca \vert{}\vert{} ''}${a.modelo || ''}</small></td>
+        <td><b>${a.nombre}</b><br><small style="color:var(--muted)">${a.marca || ''}${a.modelo || ''}</small></td>
         <td>${a.tipo}</td>
         <td><code>${a.serial || 'S/N'}</code></td>
         <td>${a.responsable || 'Sin asignar'}</td>
@@ -1924,7 +1924,7 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       if(opener){ e.preventDefault(); if (window.openModal) window.openModal(opener.dataset.open); else showModal(opener.dataset.open); return; }
       if(e.target.closest && (e.target.closest('#modalClose') || e.target.closest('#modalCancel') || e.target === modal)) { e.preventDefault(); closeModal(); }
     }, true);
-    document.getElementById('dynamicForm')?.addEventListener('submit', e => {
+    document.getElementById('dynamicForm')?.addEventListener('submit', async e => {
       e.preventDefault(); e.stopImmediatePropagation();
       const type = modal?.dataset.type || 'presupuesto';
       const key = type === 'pago' ? 'ti_pagos' : type === 'incidencia' ? 'ti_incidencias' : type === 'activo' ? 'ti_activos' : 'ti_presupuestos';
