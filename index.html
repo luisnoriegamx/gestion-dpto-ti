@@ -129,6 +129,7 @@
     /* Modales */
     .modal-back{position:fixed;inset:0;background:rgba(18,18,18,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:90}
     .modal-back.show{display:flex}
+    .connection-badge{font-size:11px;font-weight:700;color:var(--muted);padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;white-space:nowrap}
     #tiPrintReport{position:fixed;inset:0;background:#fff;z-index:300;padding:34px;overflow:auto}
     #tiPrintReport .ti-print-card{max-width:1100px;margin:auto}
     #tiPrintReport .ti-print-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:24px}
@@ -259,7 +260,8 @@
         <h1 id="pageTitle">Resumen de TI</h1>
       </div>
       <div class="top-actions">
-        <button class="ai-btn" id="runAiBtn">✨ Analizar con DeepSeek</button>
+        <span class="connection-badge" id="syncStatusTop">● Verificando Firebase...</span>
+        <button class="ai-btn" id="runAiBtn" onclick="window.runAiFallback && window.runAiFallback(event)">✨ Analizar con DeepSeek</button>
         <button class="ghost" id="exportBtn">⇩ Exportar PDF</button>
         <button class="primary" data-open="presupuesto">+ Presupuesto</button>
         <button class="ghost danger" id="logoutBtn" title="Cerrar sesión" onclick="window.__tiLogout && window.__tiLogout(event)">Salir</button>
@@ -580,7 +582,7 @@
               <input type="text" id="newCatalogItemInput" placeholder="Escribe el nombre de la nueva opción..." style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px" />
               <button class="primary" id="addCatalogItemBtn">+ Agregar</button>
             </div>
-            <button class="ai-btn" id="suggestCatalogsBtn" type="button" style="margin-bottom:15px">✨ Sugerir catálogos con IA</button>
+            <button class="ai-btn" id="suggestCatalogsBtn" type="button" onclick="window.suggestCatalogsFallback && window.suggestCatalogsFallback(event)" style="margin-bottom:15px">✨ Sugerir catálogos con IA</button>
 
             <div class="table-wrap">
               <table class="table">
@@ -603,7 +605,7 @@
             </div>
             <div class="form">
               <label>API Key de DeepSeek
-                <input type="password" id="deepseekApiKeyInput" value="sk-ddc562b126ff44a2b8f9d9825a0ed489" />
+        <input type="password" id="deepseekApiKeyInput" value="" autocomplete="off" />
               </label>
               <button class="primary" id="saveApiKeyBtn">Guardar Clave de IA</button>
               <p style="font-size:12px;color:var(--muted);margin-top:4px">
@@ -844,6 +846,9 @@
   // CATÁLOGOS
   async function initCatalogs() {
     const catDocRef = doc(db, 'configuracion', 'catalogos');
+    // Mostrar de inmediato los valores locales/precargados; Firestore los reemplaza al sincronizar.
+    populateAllDropdowns();
+    renderCatalogTable();
     onSnapshot(catDocRef, snap => {
       if (snap.exists()) {
         STORE.catalogos = { ...STORE.catalogos, ...snap.data() };
@@ -852,7 +857,7 @@
         setDoc(catDocRef, STORE.catalogos);
       }
       populateAllDropdowns();
-      if (document.getElementById('catalogos').classList.contains('active')) renderCatalogTable();
+      renderCatalogTable();
     }, err => {
       console.warn("Fallo lectura catalogos cloud, usando local:", err);
       populateAllDropdowns();
@@ -1391,6 +1396,7 @@
     modal.classList.add('show');
     setTimeout(() => modal.querySelector('input')?.focus(), 50);
   }
+  window.openModal = openModal;
 
   window.quickConfigCatalog = catKey => {
     closeModal();
@@ -1531,6 +1537,59 @@
   // INTEGRACIÓN OFICIAL DEEPSEEK IA
   const savedKey = localStorage.getItem('deepseek_api_key') || 'sk-ddc562b126ff44a2b8f9d9825a0ed489';
   document.getElementById('deepseekApiKeyInput').value = savedKey;
+
+  async function askDeepSeekJson(systemPrompt, userPrompt) {
+    const apiKey = localStorage.getItem('deepseek_api_key') || document.getElementById('deepseekApiKeyInput').value.trim();
+    if (!apiKey) throw new Error('Configura primero tu API Key de DeepSeek en Catálogos & Opciones.');
+    const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 18000);
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+      body:JSON.stringify({model:'deepseek-chat',temperature:0.2,messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}]}), signal: controller.signal
+    }).finally(() => clearTimeout(timeout));
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content || '';
+    return JSON.parse(raw.replace(/^```json\s*/i,'').replace(/```$/,'').trim());
+  }
+
+  document.getElementById('suggestCatalogsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('suggestCatalogsBtn');
+    btn.disabled = true; btn.textContent = '⏳ Generando hasta 5 sugerencias...';
+    try {
+      const result = await askDeepSeekJson(
+        'Eres consultor de operaciones TI. Devuelve únicamente JSON válido con arrays de texto: categorias, proveedores, conceptos, areas, tipos_activo. Sugiere opciones profesionales para un departamento TI de una empresa mexicana con sucursales y control financiero.',
+        JSON.stringify({catalogos:STORE.catalogos})
+      );
+      const keys = ['categorias','proveedores','conceptos','areas','tipos_activo'];
+      keys.forEach(key => { if (Array.isArray(result[key])) STORE.catalogos[key] = [...new Set([...(STORE.catalogos[key]||[]), ...result[key].slice(0,5).map(String).map(x=>x.trim()).filter(Boolean)])]; });
+      localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+      if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
+      populateAllDropdowns(); renderCatalogTable(); showToast('Catálogos sugeridos y sincronizados con Firebase');
+    } catch (err) { alert('No se pudieron generar sugerencias: ' + err.message); }
+    finally { btn.disabled = false; btn.textContent = '✨ Sugerir catálogos con IA'; }
+  });
+
+  document.addEventListener('click', async event => {
+    const btn = event.target.closest && event.target.closest('#suggestIncidentBtn');
+    if (!btn) return;
+    const form = document.getElementById('dynamicForm');
+    const notes = form?.elements?.notas?.value?.trim();
+    if (!notes) { alert('Escribe primero una descripción en Notas de diagnóstico.'); return; }
+    btn.disabled = true; btn.textContent = 'Analizando incidencia...';
+    try {
+      const result = await askDeepSeekJson(
+        'Eres especialista de mesa de ayuda TI. Devuelve únicamente JSON válido con las claves asunto, area, prioridad, responsable y notas. Usa prioridad Crítica, Alta, Media o Baja. No inventes nombres de personas; si no hay responsable, deja cadena vacía.',
+        notes
+      );
+      if (form.elements.asunto) form.elements.asunto.value = result.asunto || '';
+      if (form.elements.area) form.elements.area.value = result.area || '';
+      if (form.elements.prioridad) form.elements.prioridad.value = result.prioridad || 'Media';
+      if (form.elements.responsable) form.elements.responsable.value = result.responsable || '';
+      if (form.elements.notas) form.elements.notas.value = result.notas || notes;
+      showToast('Incidencia clasificada con IA; revisa antes de guardar');
+    } catch (err) { alert('No se pudo analizar la incidencia: ' + err.message); }
+    finally { btn.disabled = false; btn.textContent = '✨ Sugerir clasificación y respuesta con IA'; }
+  });
 
   document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
     const val = document.getElementById('deepseekApiKeyInput').value.trim();
@@ -1720,6 +1779,10 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
   const gate = document.getElementById('authGate');
   const msg = document.getElementById('loginMsg');
   const status = document.getElementById('syncStatus');
+  const statusTop = document.getElementById('syncStatusTop');
+  const mirrorConnection = () => { if (statusTop && status) { statusTop.innerHTML = status.innerHTML; statusTop.style.color = status.style.color; } };
+  if (status) new MutationObserver(mirrorConnection).observe(status, {childList:true,subtree:true,characterData:true,attributes:true});
+  setTimeout(mirrorConnection, 500);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -1737,7 +1800,12 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
     }
   }, true);
   onAuthStateChanged(fallbackAuth, user => {
-    if (user) gate.style.display = 'none';
+    if (user) {
+      gate.style.display = 'none';
+      if (status) { status.innerHTML = '● Conectado a Firebase (<b>' + user.email.split('@')[0] + '</b>)'; status.style.color = 'var(--green)'; } mirrorConnection();
+    } else {
+      if (status) { status.textContent = '○ Sesión no iniciada'; status.style.color = 'var(--red)'; } mirrorConnection();
+    }
   });
   window.__tiLogout = async (event) => {
     if (event) { event.preventDefault(); event.stopPropagation(); }
@@ -1801,6 +1869,14 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       incidencia:[['titulo','Título de incidencia','text'],['prioridad','Prioridad','text'],['responsable','Responsable','text'],['detalle','Descripción','text']],
       activo:[['nombre','Activo / equipo','text'],['usuario','Usuario asignado','text'],['ubicacion','Ubicación','text'],['costo','Valor','number']]
     };
+    function renderLocalCatalog(){
+      const select=document.getElementById('catalogSelector'), body=document.getElementById('catalogItemsTbody');
+      if(!select||!body) return;
+      const cats=JSON.parse(localStorage.getItem('ti_catalogos')||'{}'), items=cats[select.value]||[];
+      body.innerHTML=items.length?items.map(x=>`<tr><td><b>${x}</b></td><td style="text-align:right">Precargada</td></tr>`).join(''):'<tr><td colspan="2"><div class="empty">No hay opciones. Agrega una nueva.</div></td></tr>';
+    }
+    setTimeout(renderLocalCatalog, 300);
+    document.getElementById('catalogSelector')?.addEventListener('change', renderLocalCatalog);
     function showModal(type){
       if(!modal || !fields) return;
       const labels = {presupuesto:'Nueva partida presupuestaria',pago:'Registrar pago',incidencia:'Nueva incidencia',activo:'Agregar activo'};
@@ -1809,6 +1885,8 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       const opts = key => (cats[key] || []).map(x => `<option value="${x}">${x}</option>`).join('');
       if(type === 'presupuesto' || type === 'pago') {
         fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label><label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
+      } else if(type === 'incidencia') {
+        fields.innerHTML = `<label>Asunto / Falla detectada *<input name="asunto" required></label><label>Área Responsable *<select name="area" required><option value="">Selecciona un área</option>${opts('areas')}</select></label><label>Prioridad *<select name="prioridad"><option>Media</option><option>Alta</option><option>Crítica</option><option>Baja</option></select></label><label>Responsable<input name="responsable"></label><label>Notas de diagnóstico<textarea name="notas" required></textarea></label><button type="button" class="ai-btn" id="suggestIncidentBtn">✨ Sugerir clasificación y respuesta con IA</button>`;
       } else {
         fields.innerHTML = (schema[type] || schema.presupuesto).map(([id,label,input]) => `<label>${label}<input id="fallback_${id}" name="${id}" type="${input}" required></label>`).join('');
       }
@@ -1826,7 +1904,7 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
         return;
       }
       const opener = e.target.closest && e.target.closest('[data-open]');
-      if(opener){ e.preventDefault(); showModal(opener.dataset.open); return; }
+      if(opener){ e.preventDefault(); if (window.openModal) window.openModal(opener.dataset.open); else showModal(opener.dataset.open); return; }
       if(e.target.closest && (e.target.closest('#modalClose') || e.target.closest('#modalCancel') || e.target === modal)) { e.preventDefault(); closeModal(); }
     }, true);
     document.getElementById('dynamicForm')?.addEventListener('submit', e => {
@@ -1846,7 +1924,46 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       const report = document.createElement('div'); report.id='tiPrintReport'; report.innerHTML=`<div class="ti-print-card"><div class="ti-print-head"><div><div class="eyebrow">Reporte ejecutivo</div><h1>Control TI</h1><p>Generado ${new Date().toLocaleString('es-MX')}</p></div><button id="tiPrintNow" class="primary">Imprimir / Guardar PDF</button><button id="tiPrintClose" class="ghost">Cerrar</button></div><table><tr><th>Módulo</th><th>Registro</th><th>Monto</th></tr>${rows||'<tr><td colspan="3">Sin registros</td></tr>'}</table></div>`;
       document.body.appendChild(report); document.getElementById('tiPrintNow').onclick=()=>window.print(); document.getElementById('tiPrintClose').onclick=()=>report.remove();
     }, true);
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest && e.target.closest('#suggestIncidentBtn, #suggestCatalogsBtn, #runAiBtn, #saveApiKeyBtn');
+      if (!btn) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (btn.id === 'saveApiKeyBtn') {
+        const value = document.getElementById('deepseekApiKeyInput')?.value.trim();
+        if (!value) { alert('Escribe una API Key antes de guardar.'); return; }
+        localStorage.setItem('deepseek_api_key', value);
+        alert('API Key guardada en este navegador.');
+        return;
+      }
+      const key = localStorage.getItem('deepseek_api_key') || document.getElementById('deepseekApiKeyInput')?.value.trim() || '';
+      if (!key) { alert('Configura primero tu API Key de DeepSeek en Catálogos & Opciones.'); return; }
+      btn.disabled = true;
+      try {
+        const isIncident = btn.id === 'suggestIncidentBtn';
+        const isAnalysis = btn.id === 'runAiBtn';
+        const form = document.getElementById('dynamicForm');
+        const promptText = isIncident ? (form?.elements?.notas?.value || '') : isAnalysis ? JSON.stringify({presupuestos:JSON.parse(localStorage.getItem('ti_presupuestos')||'[]'),pagos:JSON.parse(localStorage.getItem('ti_pagos')||'[]'),incidencias:JSON.parse(localStorage.getItem('ti_incidencias')||'[]')}) : 'Sugiere catálogos profesionales para un departamento de TI mexicano. Devuelve JSON con arrays: categorias, proveedores, conceptos, areas, tipos_activo.';
+        if (isIncident && !promptText.trim()) throw new Error('Escribe primero las notas de la incidencia.');
+        const response = await fetch('https://api.deepseek.com/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'deepseek-chat',temperature:.2,messages:[{role:'system',content:isIncident?'Devuelve JSON válido con asunto, area, prioridad, responsable y notas.':isAnalysis?'Eres director de TI. Devuelve un análisis ejecutivo en HTML limpio, sin markdown ni bloques de código.':'Devuelve únicamente JSON válido.'},{role:'user',content:promptText}]})});
+        if(!response.ok) throw new Error('HTTP '+response.status);
+        const raw=(await response.json()).choices?.[0]?.message?.content||'{}'; const result=JSON.parse(raw.replace(/^```json\s*/i,'').replace(/```$/,'').trim());
+        if (isAnalysis) { document.getElementById('aiOutput').innerHTML = raw.replace(/```html|```/g,''); alert('Análisis de IA completado.'); return; }
+        if(isIncident){ if(form.elements.asunto) form.elements.asunto.value=result.asunto||''; if(form.elements.area) form.elements.area.value=result.area||''; if(form.elements.prioridad) form.elements.prioridad.value=result.prioridad||'Media'; if(form.elements.responsable) form.elements.responsable.value=result.responsable||''; if(form.elements.notas) form.elements.notas.value=result.notas||promptText; }
+        else { const cats=JSON.parse(localStorage.getItem('ti_catalogos')||'{}'); ['categorias','proveedores','conceptos','areas','tipos_activo'].forEach(k=>{if(Array.isArray(result[k])) cats[k]=[...new Set([...(cats[k]||[]),...result[k].slice(0,5)])]}); localStorage.setItem('ti_catalogos',JSON.stringify(cats)); const body=document.getElementById('catalogItemsTbody'); if(body) body.innerHTML='<tr><td colspan="2"><div class="empty">Catálogos actualizados. Selecciona una lista para ver sus opciones.</div></td></tr>'; alert('Hasta 5 sugerencias por catálogo fueron agregadas.'); }
+      } catch(err) { alert(err.name === 'AbortError' ? 'DeepSeek no respondió en 18 segundos. En Vercel necesitas un proxy /api/deepseek para evitar bloqueos CORS y no exponer la clave.' : 'No se pudo completar la sugerencia: '+err.message); }
+      finally { btn.disabled=false; }
+    }, true);
   })();
+</script>
+<script>
+  async function deepseekFallbackRequest(system, user) {
+    const key = localStorage.getItem('deepseek_api_key') || document.getElementById('deepseekApiKeyInput')?.value.trim();
+    if (!key) throw new Error('Configura y guarda tu API Key de DeepSeek en Catálogos & Opciones.');
+    const controller = new AbortController(); const timer = setTimeout(()=>controller.abort(),18000);
+    try { const r=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'deepseek-chat',temperature:.2,messages:[{role:'system',content:system},{role:'user',content:user}]}),signal:controller.signal}); if(!r.ok) throw new Error('DeepSeek respondió HTTP '+r.status); return await r.json(); } finally { clearTimeout(timer); }
+  }
+  window.runAiFallback = async event => { event?.preventDefault(); const b=document.getElementById('runAiBtn'), out=document.getElementById('aiOutput'); b.disabled=true; out.innerHTML='<i>Consultando DeepSeek...</i>'; try { const data=await deepseekFallbackRequest('Eres director de TI. Devuelve un análisis ejecutivo en HTML limpio, sin markdown ni bloques de código.',JSON.stringify({presupuestos:JSON.parse(localStorage.getItem('ti_presupuestos')||'[]'),pagos:JSON.parse(localStorage.getItem('ti_pagos')||'[]'),incidencias:JSON.parse(localStorage.getItem('ti_incidencias')||'[]')})); out.innerHTML=(data.choices?.[0]?.message?.content||'Sin respuesta').replace(/```html|```/g,''); } catch(e) { out.innerHTML='<b style="color:var(--red)">'+(e.name==='AbortError'?'DeepSeek no respondió en 18 segundos. En Vercel usa un proxy /api/deepseek.':e.message)+'</b>'; } finally { b.disabled=false; } };
+  window.suggestCatalogsFallback = async event => { event?.preventDefault(); const b=document.getElementById('suggestCatalogsBtn'); b.disabled=true; b.textContent='⏳ Consultando DeepSeek...'; try { const data=await deepseekFallbackRequest('Devuelve únicamente JSON válido con arrays de máximo 5 elementos por clave: categorias, proveedores, conceptos, areas, tipos_activo.','Sugiere catálogos profesionales para un departamento de TI mexicano.'); const raw=data.choices?.[0]?.message?.content||'{}'; const result=JSON.parse(raw.replace(/^```json\s*/i,'').replace(/```$/,'').trim()); const cats=JSON.parse(localStorage.getItem('ti_catalogos')||'{}'); ['categorias','proveedores','conceptos','areas','tipos_activo'].forEach(k=>{if(Array.isArray(result[k])) cats[k]=[...new Set([...(cats[k]||[]),...result[k].slice(0,5)])]}); localStorage.setItem('ti_catalogos',JSON.stringify(cats)); const body=document.getElementById('catalogItemsTbody'); if(body) body.innerHTML='<tr><td colspan="2">Catálogos actualizados. Selecciona una lista para revisar.</td></tr>'; } catch(e) { alert(e.name==='AbortError'?'DeepSeek no respondió en 18 segundos. En Vercel usa un proxy /api/deepseek.':e.message); } finally { b.disabled=false; b.textContent='✨ Sugerir catálogos con IA'; } };
 </script>
 </body>
 </html>
