@@ -78,7 +78,7 @@
     .panel h3{font-size:16px;margin:0;font-weight:700}
     .panel-sub{font-size:12px;color:var(--muted);margin-top:3px}
     
-    /* AI Insight Box */
+    /* AI Box */
     .ai-box{background:linear-gradient(to right, #faf5ff, #f5f3ff);border:1px solid #ddd6fe;border-radius:14px;padding:20px;margin-bottom:20px}
     .ai-box-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
     .ai-badge{display:inline-flex;align-items:center;gap:6px;background:#8b5cf6;color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.04em}
@@ -121,7 +121,7 @@
     .filters{display:flex;gap:10px;flex-wrap:wrap}
     .filters input,.filters select{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font-size:13px}
     
-    /* Selector con botón de edición rápida */
+    /* Configuración rápida en campos select */
     .field-with-config{display:flex;gap:8px;align-items:center}
     .field-with-config select{flex:1}
     .btn-config-field{background:#f0f0ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;color:#555}
@@ -147,7 +147,7 @@
 
     /* Auth Gate */
     #authGate{position:fixed;inset:0;background:rgba(18,18,18,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
-    .auth-box{background:#fff;border-radius:16px;padding:28px;width:min(420px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .auth-box{background:#fff;border-radius:16px;padding:28px;width:min(440px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3)}
 
     @media(max-width:1024px){
       .sidebar{width:70px;padding:20px 8px}
@@ -168,21 +168,27 @@
 </head>
 <body>
 
-<!-- AUTENTICACIÓN FIREBASE -->
+<!-- AUTENTICACIÓN FIREBASE COMPLETA (INICIO, CREACIÓN Y RECUPERACIÓN) -->
 <div id="authGate">
   <div class="auth-box">
     <div class="eyebrow">Acceso Seguro Cloud</div>
     <h2 style="margin:6px 0 6px">Control TI · Finanzas e IA</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Inicia sesión con tu cuenta de TI para sincronizar datos y activar el analista IA.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Inicia sesión con tu cuenta institucional o créala en el proyecto si es tu primer acceso.</p>
     <form id="loginForm" class="form">
       <label>Correo Electrónico
-        <input id="loginEmail" type="email" required placeholder="admin@empresa.com" autocomplete="email">
+        <input id="loginEmail" type="email" required value="lnoriega@mileniumgasolineras.com" autocomplete="email">
       </label>
       <label>Contraseña
-        <input id="loginPass" type="password" required placeholder="••••••••" autocomplete="current-password">
+        <input id="loginPass" type="password" required value="Luna1309" autocomplete="current-password">
       </label>
-      <button class="primary" type="submit" style="margin-top:6px">Entrar al Sistema</button>
-      <div id="loginMsg" style="font-size:12px;color:var(--red);margin-top:4px"></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="primary" type="submit" style="flex:1" id="loginBtn">Entrar</button>
+        <button class="ghost" id="registerBtn" type="button" title="Crea el usuario en Firebase Authentication de inmediato">Crear cuenta</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <button type="button" id="resetPassBtn" class="ghost" style="border:0;padding:0;font-size:12px;color:var(--orange);text-decoration:underline">¿Olvidaste tu contraseña?</button>
+      </div>
+      <div id="loginMsg" style="font-size:12px;margin-top:6px"></div>
     </form>
   </div>
 </div>
@@ -251,7 +257,7 @@
           <div>
             <div class="eyebrow" id="currentDateString">Cargando fecha...</div>
             <h2>Operación y Finanzas TI en Vivo</h2>
-            <p>Métricas de ejecución presupuestal, incidentes y análisis inteligente.</p>
+            <p>Métricas consolidadas, control de liquidez y diagnóstico predictivo.</p>
           </div>
         </div>
 
@@ -262,7 +268,7 @@
             <button class="ghost" style="padding:4px 10px;font-size:11px" id="configApiKeyBtn">⚙ Configurar API Key</button>
           </div>
           <div class="ai-content" id="aiOutput">
-            Haz clic en <b>"✨ Analizar con DeepSeek"</b> en la barra superior para que el motor de IA evalúe en tiempo real los presupuestos, costos por ubicación, pagos próximos e incidencias activas.
+            Haz clic en <b>"✨ Analizar con DeepSeek"</b> para que la IA audite tus presupuestos, costos por ubicación, fechas de pago programadas e incidencias activas.
           </div>
         </div>
 
@@ -290,12 +296,12 @@
         </div>
 
         <div class="grid grid-2">
-          <!-- Distribución Presupuestal -->
+          <!-- Presupuesto por Categoría -->
           <div class="card panel">
             <div class="panel-head">
               <div>
                 <h3>Presupuesto por Categoría</h3>
-                <div class="panel-sub">Monitoreo de costo vs partidas asignadas</div>
+                <div class="panel-sub">Monitoreo de gasto ejecutado vs partidas asignadas</div>
               </div>
               <button class="ghost" data-open="presupuesto">+ Nueva Partida</button>
             </div>
@@ -304,12 +310,12 @@
             </div>
           </div>
 
-          <!-- Próximos Vencimientos del Presupuesto -->
+          <!-- Próximos Vencimientos -->
           <div class="card panel">
             <div class="panel-head">
               <div>
                 <h3>Compromisos y Fechas de Pago</h3>
-                <div class="panel-sub">Partidas con vencimiento en los próximos 30 días</div>
+                <div class="panel-sub">Partidas con pago programado en los siguientes 30 días</div>
               </div>
             </div>
             <div class="table-wrap">
@@ -331,12 +337,12 @@
             <div class="panel-head">
               <div>
                 <h3>Incidencias Activas</h3>
-                <div class="panel-sub">Tickets sin resolver en cola de soporte</div>
+                <div class="panel-sub">Tickets en cola de soporte</div>
               </div>
               <button class="ghost" data-open="incidencia">+ Nueva</button>
             </div>
             <div class="list" id="dashIncidentsList">
-              <div class="empty">Operación al 100%. No hay incidencias abiertas.</div>
+              <div class="empty">Operación al 100%. No hay tickets activos.</div>
             </div>
           </div>
 
@@ -345,7 +351,7 @@
             <div class="panel-head">
               <div>
                 <h3>Accesos Rápidos</h3>
-                <div class="panel-sub">Operaciones de captura inmediata</div>
+                <div class="panel-sub">Operaciones inmediatas</div>
               </div>
             </div>
             <div style="display:grid;gap:10px">
@@ -582,7 +588,7 @@
               </label>
               <button class="primary" id="saveApiKeyBtn">Guardar Clave de IA</button>
               <p style="font-size:12px;color:var(--muted);margin-top:4px">
-                Se almacena en el almacenamiento local de tu navegador para realizar llamadas seguras vía HTTPS directo a los servidores de DeepSeek.
+                Se almacena en tu navegador para realizar llamadas seguras vía HTTPS directo a los servidores de DeepSeek.
               </p>
             </div>
           </div>
@@ -616,10 +622,15 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
   import { 
-    getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc 
+    getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc 
   } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
   import { 
-    getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+    getAuth, 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    sendPasswordResetEmail, 
+    signOut, 
+    onAuthStateChanged 
   } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
   // CONFIGURACIÓN OFICIAL FIREBASE
@@ -636,7 +647,7 @@
   const db = getFirestore(app);
   const auth = getAuth(app);
 
-  // ESTADO LOCAL DE CATÁLOGOS Y DATOS
+  // ESTADO LOCAL DE DATOS Y CATÁLOGOS
   const STORE = {
     presupuestos: [],
     pagos: [],
@@ -685,7 +696,7 @@
 
   navBtns.forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
 
-  // AUTHENTICATION
+  // AUTHENTICATION FLOW
   const authGate = document.getElementById('authGate');
   const loginForm = document.getElementById('loginForm');
   const loginMsg = document.getElementById('loginMsg');
@@ -704,17 +715,68 @@
     }
   });
 
+  // Iniciar Sesión Normal
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
-    loginMsg.textContent = 'Autenticando...';
+    loginMsg.style.color = 'var(--muted)';
+    loginMsg.textContent = 'Autenticando credenciales...';
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
     try {
-      await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value);
+      await signInWithEmailAndPassword(auth, email, pass);
       loginMsg.textContent = '';
     } catch (err) {
-      loginMsg.textContent = 'Error: Credenciales no válidas (' + err.code + ')';
+      loginMsg.style.color = 'var(--red)';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        loginMsg.innerHTML = 'Usuario o contraseña incorrectos. Si no lo has registrado aún en Firebase, haz clic en el botón <b>"Crear cuenta"</b>.';
+      } else {
+        loginMsg.textContent = 'Error: ' + err.message;
+      }
     }
   });
 
+  // Botón Crear Cuenta (Registra en Firebase Authentication de inmediato)
+  document.getElementById('registerBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (!email || !pass) {
+      alert('Ingresa el correo y la contraseña a registrar.');
+      return;
+    }
+    loginMsg.style.color = 'var(--blue)';
+    loginMsg.textContent = 'Registrando cuenta en Firebase Authentication...';
+    try {
+      await createUserWithEmailAndPassword(auth, email, pass);
+      loginMsg.style.color = 'var(--green)';
+      loginMsg.textContent = '¡Cuenta creada y autenticada con éxito!';
+    } catch (err) {
+      loginMsg.style.color = 'var(--red)';
+      if (err.code === 'auth/email-already-in-use') {
+        loginMsg.textContent = 'Esta cuenta ya existe en Firebase. La contraseña ingresada no coincide o puedes pulsar "¿Olvidaste tu contraseña?".';
+      } else if (err.code === 'auth/weak-password') {
+        loginMsg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+      } else {
+        loginMsg.textContent = 'Error: ' + err.message;
+      }
+    }
+  });
+
+  // Botón Olvidé mi Contraseña
+  document.getElementById('resetPassBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    if (!email) {
+      alert('Por favor escribe tu correo electrónico en el campo superior.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert('Se envió un correo a ' + email + ' con las instrucciones para restablecer tu contraseña.');
+    } catch (err) {
+      alert('No se pudo enviar el correo de recuperación: ' + err.message);
+    }
+  });
+
+  // Cerrar Sesión
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     if (confirm('¿Cerrar sesión del sistema?')) {
       await signOut(auth);
@@ -739,11 +801,85 @@
   function populateDropdown(selectElement, list, defaultText = "Selecciona una opción") {
     if (!selectElement) return;
     const currentVal = selectElement.value;
-    selectElement.innerHTML = defaultText ? `<option value="">${defaultText}</option>` : '';     (list \vert{}\vert{} []).forEach(item => {       const opt = document.createElement('option');       opt.value = item;       opt.textContent = item;       selectElement.appendChild(opt);     });     if (currentVal && list.includes(currentVal)) selectElement.value = currentVal;   }    function populateAllDropdowns() {     // Filtros     populateDropdown(document.getElementById('filterPresCategoria'), STORE.catalogos.categorias, "Todas las categorías");     populateDropdown(document.getElementById('filterPresUbicacion'), STORE.catalogos.ubicaciones, "Todas las ubicaciones");     populateDropdown(document.getElementById('filterPresClasificacion'), STORE.catalogos.clasificaciones, "Todas las clasificaciones");     populateDropdown(document.getElementById('filterPagoCategoria'), STORE.catalogos.categorias, "Todas las categorías");     populateDropdown(document.getElementById('filterIncArea'), STORE.catalogos.areas, "Todas las áreas");     populateDropdown(document.getElementById('filterActTipo'), STORE.catalogos.tipos_activo, "Todos los tipos");     populateDropdown(document.getElementById('filterActUbicacion'), STORE.catalogos.ubicaciones, "Todas las ubicaciones");   }    // SUSCRIPCIONES EN TIEMPO REAL A FIRESTORE   function initRealtime() {     initCatalogs();      // 1. Presupuestos     onSnapshot(collection(db, 'presupuestos'), snap => {       STORE.presupuestos = snap.docs.map(d => ({ id: d.id, ...d.data() }));       renderPresupuestos();       recalcKPIsAndDashboard();     });      // 2. Pagos     onSnapshot(collection(db, 'pagos'), snap => {       STORE.pagos = snap.docs.map(d => ({ id: d.id, ...d.data() }));       renderPagos();       recalcKPIsAndDashboard();     });      // 3. Incidencias     onSnapshot(collection(db, 'incidencias'), snap => {       STORE.incidencias = snap.docs.map(d => ({ id: d.id, ...d.data() }));       renderIncidencias();       recalcKPIsAndDashboard();     });      // 4. Activos     onSnapshot(collection(db, 'activos'), snap => {       STORE.activos = snap.docs.map(d => ({ id: d.id, ...d.data() }));       renderActivos();     });   }    // CÁLCULOS GENERALES DE KPIS Y DASHBOARD   function recalcKPIsAndDashboard() {     const totalPresupuesto = STORE.presupuestos.reduce((acc, p) => acc + (Number(p.costo) \vert{}\vert{} 0), 0);     const totalGasto = STORE.pagos.reduce((acc, p) => acc + (Number(p.monto) \vert{}\vert{} 0), 0);          document.getElementById('kpiPresupuestoTotal').textContent = fmtMoney(totalPresupuesto);     document.getElementById('kpiPresupuestoCount').textContent = `${STORE.presupuestos.length} partidas presupuestadas`;
+    selectElement.innerHTML = defaultText ? `<option value="">${defaultText}</option>` : '';
+    (list || []).forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item;
+      opt.textContent = item;
+      selectElement.appendChild(opt);
+    });
+    if (currentVal && list.includes(currentVal)) selectElement.value = currentVal;
+  }
+
+  function populateAllDropdowns() {
+    populateDropdown(document.getElementById('filterPresCategoria'), STORE.catalogos.categorias, "Todas las categorías");
+    populateDropdown(document.getElementById('filterPresUbicacion'), STORE.catalogos.ubicaciones, "Todas las ubicaciones");
+    populateDropdown(document.getElementById('filterPresClasificacion'), STORE.catalogos.clasificaciones, "Todas las clasificaciones");
+    populateDropdown(document.getElementById('filterPagoCategoria'), STORE.catalogos.categorias, "Todas las categorías");
+    populateDropdown(document.getElementById('filterIncArea'), STORE.catalogos.areas, "Todas las áreas");
+    populateDropdown(document.getElementById('filterActTipo'), STORE.catalogos.tipos_activo, "Todos los tipos");
+    populateDropdown(document.getElementById('filterActUbicacion'), STORE.catalogos.ubicaciones, "Todas las ubicaciones");
+  }
+
+  // SUSCRIPCIONES EN TIEMPO REAL A FIRESTORE
+  function initRealtime() {
+    initCatalogs();
+
+    onSnapshot(collection(db, 'presupuestos'), snap => {
+      STORE.presupuestos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderPresupuestos();
+      recalcKPIsAndDashboard();
+    });
+
+    onSnapshot(collection(db, 'pagos'), snap => {
+      STORE.pagos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderPagos();
+      recalcKPIsAndDashboard();
+    });
+
+    onSnapshot(collection(db, 'incidencias'), snap => {
+      STORE.incidencias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderIncidencias();
+      recalcKPIsAndDashboard();
+    });
+
+    onSnapshot(collection(db, 'activos'), snap => {
+      STORE.activos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderActivos();
+    });
+  }
+
+  // CÁLCULOS DE KPIS Y DASHBOARD
+  function recalcKPIsAndDashboard() {
+    const totalPresupuesto = STORE.presupuestos.reduce((acc, p) => acc + (Number(p.costo) || 0), 0);
+    const totalGasto = STORE.pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+    
+    document.getElementById('kpiPresupuestoTotal').textContent = fmtMoney(totalPresupuesto);
+    document.getElementById('kpiPresupuestoCount').textContent = `${STORE.presupuestos.length} partidas presupuestadas`;
     document.getElementById('kpiGastoTotal').textContent = fmtMoney(totalGasto);
 
     const pct = totalPresupuesto > 0 ? ((totalGasto / totalPresupuesto) * 100).toFixed(1) : 0;
-    document.getElementById('kpiPresupuestoPct').textContent = `${pct}\% ejercido`;      // Próximos Pagos (< 30 días)     const now = new Date();     let proxMonto = 0;     let urgentes = 0;     const upcoming = [];      STORE.presupuestos.forEach(p => {       if (!p.fechaPago) return;       const f = new Date(p.fechaPago + 'T00:00:00');       const diff = Math.ceil((f - now) / (1000 * 60 * 60 * 24));       if (diff >= -1 && diff <= 30) {         proxMonto += Number(p.costo) \vert{}\vert{} 0;         upcoming.push({ ...p, diff });         if (diff <= 7) urgentes++;       }     });      document.getElementById('kpiPagosProx').textContent = fmtMoney(proxMonto);     document.getElementById('kpiPagosAlerta').textContent = urgentes > 0 ? `${urgentes} en menos de 7 días` : 'Sin pagos inmediatos';
+    document.getElementById('kpiPresupuestoPct').textContent = `${pct}% ejercido`;
+
+    // Próximos Pagos (< 30 días)
+    const now = new Date();
+    let proxMonto = 0;
+    let urgentes = 0;
+    const upcoming = [];
+
+    STORE.presupuestos.forEach(p => {
+      if (!p.fechaPago) return;
+      const f = new Date(p.fechaPago + 'T00:00:00');
+      const diff = Math.ceil((f - now) / (1000 * 60 * 60 * 24));
+      if (diff >= -1 && diff <= 30) {
+        proxMonto += Number(p.costo) || 0;
+        upcoming.push({ ...p, diff });
+        if (diff <= 7) urgentes++;
+      }
+    });
+
+    document.getElementById('kpiPagosProx').textContent = fmtMoney(proxMonto);
+    document.getElementById('kpiPagosAlerta').textContent = urgentes > 0 ? `${urgentes} en menos de 7 días` : 'Sin pagos inmediatos';
 
     // Incidencias
     const abiertas = STORE.incidencias.filter(i => i.estado !== 'Resuelta');
@@ -819,7 +955,7 @@
     }
   }
 
-  // RENDERIZADO: PRESUPUESTOS (CON PROVEEDOR, PRODUCTO, COSTO, FECHA PAGO, UBICACIÓN, CLASIFICACIÓN, CONCEPTO)
+  // RENDERIZADO: PRESUPUESTOS (DETALLADO)
   function renderPresupuestos() {
     const q = (document.getElementById('filterPresQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPresCategoria').value;
@@ -976,7 +1112,7 @@
     `).join('');
   }
 
-  // GESTOR DE CATÁLOGOS Y OPCIONES (EDITAR / AGREGAR / ELIMINAR DIRECTAMENTE)
+  // GESTOR DE CATÁLOGOS Y OPCIONES
   function renderCatalogTable() {
     const key = document.getElementById('catalogSelector').value;
     const items = STORE.catalogos[key] || [];
@@ -1038,7 +1174,6 @@
     }
   };
 
-  // GENERACIÓN DINÁMICA DE OPCIONES PARA SELECTS EN MODALES
   function buildOptionsHtml(list) {
     return (list || []).map(opt => `<option value="${opt}">${opt}</option>`).join('');
   }
@@ -1179,13 +1314,13 @@
 
   function openModal(type) {
     activeModalType = type;
-    const titles = {
+    const modalTitles = {
       presupuesto: 'Registrar Partida de Presupuesto',
       pago: 'Registrar Pago / Factura',
       incidencia: 'Levantar Ticket de Incidencia',
       activo: 'Registrar Activo Tecnológico'
     };
-    modalTitle.textContent = titles[type] || 'Registrar Movimiento';
+    modalTitle.textContent = modalTitles[type] || 'Registrar Movimiento';
     formFields.innerHTML = getFormHtml(type);
     modal.classList.add('show');
     setTimeout(() => modal.querySelector('input')?.focus(), 50);
@@ -1318,7 +1453,6 @@
     aiOutput.innerHTML = '<i>Generando análisis financiero y operativo con DeepSeek IA... por favor espera unos segundos.</i>';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Preparación del contexto para la IA
     const payloadData = {
       presupuestos: STORE.presupuestos.map(p => ({
         proveedor: p.proveedor,
