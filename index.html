@@ -129,6 +129,12 @@
     /* Modales */
     .modal-back{position:fixed;inset:0;background:rgba(18,18,18,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:90}
     .modal-back.show{display:flex}
+    #tiPrintReport{position:fixed;inset:0;background:#fff;z-index:300;padding:34px;overflow:auto}
+    #tiPrintReport .ti-print-card{max-width:1100px;margin:auto}
+    #tiPrintReport .ti-print-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:24px}
+    #tiPrintReport h1{font-size:30px;margin:6px 0;color:var(--orange)}
+    #tiPrintReport table{width:100%;border-collapse:collapse} #tiPrintReport th,#tiPrintReport td{padding:11px;border-bottom:1px solid var(--line);text-align:left} #tiPrintReport th{background:var(--ink);color:#fff}
+    @media print{body>*:not(#tiPrintReport){display:none!important}#tiPrintReport{position:static;padding:0}#tiPrintReport button{display:none!important}}
     .modal{background:#fff;border-radius:16px;width:min(560px,100%);padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto}
     .modal-head{display:flex;justify-content:space-between;align-items:center}
     .modal h3{margin:0;font-size:19px}
@@ -561,6 +567,8 @@
               </div>
               <select id="catalogSelector" style="padding:8px 12px;border-radius:8px;border:1px solid var(--line)">
                 <option value="categorias">Categorías de Presupuesto y Pago</option>
+                <option value="proveedores">Proveedores</option>
+                <option value="conceptos">Conceptos de gasto</option>
                 <option value="ubicaciones">Ubicaciones del Servicio</option>
                 <option value="clasificaciones">Clasificación Contable/Operativa</option>
                 <option value="areas">Áreas de Soporte TI</option>
@@ -572,6 +580,7 @@
               <input type="text" id="newCatalogItemInput" placeholder="Escribe el nombre de la nueva opción..." style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px" />
               <button class="primary" id="addCatalogItemBtn">+ Agregar</button>
             </div>
+            <button class="ai-btn" id="suggestCatalogsBtn" type="button" style="margin-bottom:15px">✨ Sugerir catálogos con IA</button>
 
             <div class="table-wrap">
               <table class="table">
@@ -676,12 +685,18 @@
     activos: JSON.parse(localStorage.getItem('ti_activos') || '[]'),
     catalogos: JSON.parse(localStorage.getItem('ti_catalogos') || JSON.stringify({
       categorias: ["Servicios Cloud", "Licencias & Software", "Equipamiento & Hardware", "Soporte Externo & Consultoría", "Telecomunicaciones & Enlaces"],
+      proveedores: ["Microsoft", "Google Workspace", "AWS", "Telmex / Totalplay", "Dell", "Soporte externo"],
+      conceptos: ["Renovación de licencias", "Suscripción mensual", "Mantenimiento preventivo", "Soporte técnico", "Compra de equipo", "Conectividad / enlace", "Seguridad informática"],
       ubicaciones: ["Estación Matriz", "Sucursal Norte", "Sucursal Reynosa", "Sucursal Cosmópolis", "Site Central / Data Center"],
       clasificaciones: ["Gasto Operativo (OPEX)", "Inversión de Capital (CAPEX)", "Renovación Anual", "Mantenimiento Preventivo"],
       areas: ["Redes e Infraestructura", "Sistemas y CONTPAQi", "Accesos y Permisos", "Soporte a Estaciones", "Seguridad Informática"],
       tipos_activo: ["Equipo de Cómputo", "Servidor / Redes", "Dispositivo Móvil", "Impresora / Periférico", "Licencia de Software"]
     }))
   };
+
+  // Compatibilidad con catálogos creados en versiones anteriores.
+  STORE.catalogos.proveedores ||= ["Microsoft", "Google Workspace", "AWS", "Telmex / Totalplay", "Dell", "Soporte externo"];
+  STORE.catalogos.conceptos ||= ["Renovación de licencias", "Suscripción mensual", "Mantenimiento preventivo", "Soporte técnico", "Compra de equipo", "Conectividad / enlace", "Seguridad informática"];
 
   let activeModalType = 'presupuesto';
 
@@ -1237,13 +1252,13 @@
     if (type === 'presupuesto') {
       return `
         <label>Proveedor *
-          <input name="proveedor" required placeholder="Ej. Microsoft México, Dell, Totalplay" />
+          <div class="field-with-config"><select name="proveedor" required>${buildOptionsHtml(STORE.catalogos.proveedores)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('proveedores')">+</button></div>
         </label>
         <label>Producto o Servicio *
           <input name="producto" required placeholder="Ej. Licenciamiento M365, Servidor PowerEdge, Enlace Dedicado" />
         </label>
         <label>Concepto / Detalle de la Partida *
-          <input name="concepto" required placeholder="Ej. Renovación anual 120 buzones, Enlace 100 Mbps Simétrico" />
+          <div class="field-with-config"><select name="concepto" required>${buildOptionsHtml(STORE.catalogos.conceptos)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('conceptos')">+</button></div>
         </label>
         <label>Costo Estimado / Monto Presupuestado (MXN) *
           <input name="costo" type="number" step="0.01" required placeholder="0.00" />
@@ -1274,10 +1289,10 @@
     if (type === 'pago') {
       return `
         <label>Proveedor *
-          <input name="proveedor" required placeholder="Ej. AWS, Telmex, Compusoluciones" />
+          <div class="field-with-config"><select name="proveedor" required>${buildOptionsHtml(STORE.catalogos.proveedores)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('proveedores')">+</button></div>
         </label>
         <label>Concepto / Factura *
-          <input name="concepto" required placeholder="Ej. Factura F-2940 consumo agosto" />
+          <div class="field-with-config"><select name="concepto" required>${buildOptionsHtml(STORE.catalogos.conceptos)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('conceptos')">+</button></div>
         </label>
         <label>Monto Pagado (MXN) *
           <input name="monto" type="number" step="0.01" required placeholder="0.00" />
@@ -1324,6 +1339,7 @@
         <label>Notas de diagnóstico
           <textarea name="notas" placeholder="Detalles de la IP, software CONTPAQi, puerto afectado..."></textarea>
         </label>
+        <button type="button" class="ai-btn" id="suggestIncidentBtn">✨ Sugerir clasificación y respuesta con IA</button>
       `;
     }
     if (type === 'activo') {
@@ -1731,6 +1747,20 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
     document.getElementById('loginPass').value = '';
     msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.';
   };
+
+  window.quickAddCatalog = async catKey => {
+    const label = catKey === 'proveedores' ? 'proveedor' : catKey === 'conceptos' ? 'concepto' : 'opción';
+    const value = prompt(`Escribe el nuevo ${label}:`);
+    if (!value || !value.trim()) return;
+    const clean = value.trim();
+    STORE.catalogos[catKey] = STORE.catalogos[catKey] || [];
+    if (STORE.catalogos[catKey].includes(clean)) { alert('Esa opción ya existe.'); return; }
+    STORE.catalogos[catKey].push(clean);
+    localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+    if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
+    showToast('Opción agregada y sincronizada');
+    openModal(activeModalType);
+  };
   document.getElementById('logoutBtn').addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -1756,6 +1786,67 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
     if (msg) { msg.style.color = 'var(--green)'; msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.'; }
     if (window.__tiLogout) Promise.resolve(window.__tiLogout()).catch(() => {});
   }, true);
+</script>
+<script>
+  // Capa de interacción de respaldo para que la interfaz no quede estática si un
+  // módulo opcional de Firebase se carga tarde o es bloqueado por el navegador.
+  (() => {
+    const titles = { dashboard:'Resumen de TI', presupuesto:'Planeación de Presupuesto', proveedores:'Pagos Realizados', incidencias:'Gestión de Incidencias', activos:'Inventario de Activos TI', catalogos:'Catálogos & Opciones' };
+    const modal = document.getElementById('modal');
+    const fields = document.getElementById('formFields');
+    const title = document.getElementById('modalTitle');
+    const schema = {
+      presupuesto:[['nombre','Partida / concepto','text'],['monto','Monto presupuestado','number'],['categoria','Categoría','text'],['detalle','Detalle','text']],
+      pago:[['proveedor','Proveedor','text'],['concepto','Concepto / servicio','text'],['costo','Costo','number'],['fechaPago','Fecha de pago','date']],
+      incidencia:[['titulo','Título de incidencia','text'],['prioridad','Prioridad','text'],['responsable','Responsable','text'],['detalle','Descripción','text']],
+      activo:[['nombre','Activo / equipo','text'],['usuario','Usuario asignado','text'],['ubicacion','Ubicación','text'],['costo','Valor','number']]
+    };
+    function showModal(type){
+      if(!modal || !fields) return;
+      const labels = {presupuesto:'Nueva partida presupuestaria',pago:'Registrar pago',incidencia:'Nueva incidencia',activo:'Agregar activo'};
+      title.textContent = labels[type] || 'Nuevo registro';
+      const cats = JSON.parse(localStorage.getItem('ti_catalogos') || '{}');
+      const opts = key => (cats[key] || []).map(x => `<option value="${x}">${x}</option>`).join('');
+      if(type === 'presupuesto' || type === 'pago') {
+        fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label><label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
+      } else {
+        fields.innerHTML = (schema[type] || schema.presupuesto).map(([id,label,input]) => `<label>${label}<input id="fallback_${id}" name="${id}" type="${input}" required></label>`).join('');
+      }
+      modal.dataset.type = type; modal.classList.add('show');
+    }
+    function closeModal(){ if(modal) modal.classList.remove('show'); }
+    document.addEventListener('click', e => {
+      const nav = e.target.closest && e.target.closest('#nav button[data-view]');
+      if(nav){
+        e.preventDefault();
+        const id = nav.dataset.view;
+        document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
+        document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b === nav));
+        const page = document.getElementById('pageTitle'); if(page) page.textContent = titles[id] || 'Control TI';
+        return;
+      }
+      const opener = e.target.closest && e.target.closest('[data-open]');
+      if(opener){ e.preventDefault(); showModal(opener.dataset.open); return; }
+      if(e.target.closest && (e.target.closest('#modalClose') || e.target.closest('#modalCancel') || e.target === modal)) { e.preventDefault(); closeModal(); }
+    }, true);
+    document.getElementById('dynamicForm')?.addEventListener('submit', e => {
+      e.preventDefault(); e.stopImmediatePropagation();
+      const type = modal?.dataset.type || 'presupuesto';
+      const key = type === 'pago' ? 'ti_pagos' : type === 'incidencia' ? 'ti_incidencias' : type === 'activo' ? 'ti_activos' : 'ti_presupuestos';
+      const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      const list = JSON.parse(localStorage.getItem(key) || '[]'); list.push({id:Date.now().toString(),...data,createdAt:new Date().toISOString()}); localStorage.setItem(key, JSON.stringify(list));
+      closeModal(); document.getElementById('toast').textContent='Registro guardado'; document.getElementById('toast').classList.add('show'); setTimeout(()=>document.getElementById('toast').classList.remove('show'),2200);
+      location.reload();
+    }, true);
+    document.getElementById('exportBtn')?.addEventListener('click', e => {
+      e.preventDefault(); e.stopImmediatePropagation();
+      const old = document.getElementById('tiPrintReport');
+      if (old) old.remove();
+      const rows = ['presupuestos','pagos','incidencias','activos'].flatMap(k => JSON.parse(localStorage.getItem('ti_'+k)||'[]').map(x => `<tr><td>${k}</td><td>${x.nombre||x.proveedor||x.titulo||''}</td><td>${x.monto||x.costo||''}</td></tr>`)).join('');
+      const report = document.createElement('div'); report.id='tiPrintReport'; report.innerHTML=`<div class="ti-print-card"><div class="ti-print-head"><div><div class="eyebrow">Reporte ejecutivo</div><h1>Control TI</h1><p>Generado ${new Date().toLocaleString('es-MX')}</p></div><button id="tiPrintNow" class="primary">Imprimir / Guardar PDF</button><button id="tiPrintClose" class="ghost">Cerrar</button></div><table><tr><th>Módulo</th><th>Registro</th><th>Monto</th></tr>${rows||'<tr><td colspan="3">Sin registros</td></tr>'}</table></div>`;
+      document.body.appendChild(report); document.getElementById('tiPrintNow').onclick=()=>window.print(); document.getElementById('tiPrintClose').onclick=()=>report.remove();
+    }, true);
+  })();
 </script>
 </body>
 </html>
