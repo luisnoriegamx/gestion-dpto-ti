@@ -172,10 +172,10 @@
   <div class="auth-box">
     <div class="eyebrow">Acceso Seguro Cloud</div>
     <h2 style="margin:6px 0 6px">Control TI · Finanzas e IA</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Inicia sesión o utiliza el modo de contingencia si Firebase está en configuración.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Inicia sesión con la cuenta autorizada de Firebase Authentication.</p>
     
     <div id="fileProtocolAlert" style="display:none;background:#fff1df;border:1px solid #ffd8a8;border-radius:8px;padding:10px;font-size:12px;color:#a86605;margin-bottom:14px">
-      ⚠️ <b>Aviso de ejecución local:</b> Estás abriendo el archivo mediante <code>file:///</code>. Para autenticación directa de Firebase es recomendable servirlo vía <code>localhost</code> (o usa el botón de Bypass abajo para trabajar de inmediato).
+      ⚠️ <b>Aviso:</b> Para autenticar con Firebase abre esta app desde Vercel, localhost o HTTPS.
     </div>
 
     <form id="loginForm" class="form">
@@ -183,20 +183,20 @@
         <input id="loginEmail" type="email" required value="lnoriega@mileniumgasolineras.com" autocomplete="email">
       </label>
       <label>Contraseña
-        <input id="loginPass" type="password" required value="Luna1309" autocomplete="current-password">
+        <input id="loginPass" type="password" required autocomplete="current-password">
       </label>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="primary" type="submit" style="flex:1" id="loginBtn">Entrar con Firebase</button>
-        <button class="ghost" id="registerBtn" type="button" title="Forzar creación en Firebase Authentication">Crear en Firebase</button>
+        <button class="ghost" id="registerBtn" type="button" hidden>Crear en Firebase</button>
       </div>
       <div id="loginMsg" style="font-size:12px;margin-top:8px;line-height:1.4"></div>
       
       <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:14px;display:flex;flex-direction:column;gap:8px">
-        <button type="button" id="bypassBtn" class="ghost" style="background:#f4f4f1;font-weight:700;color:var(--ink)">
+        <button type="button" id="bypassBtn" class="ghost" hidden style="background:#f4f4f1;font-weight:700;color:var(--ink)">
           ⚡ Entrar en Modo Local / Bypass
         </button>
         <div style="font-size:11px;color:var(--muted);text-align:center">
-          Te permite ingresar de inmediato sin bloqueos de red o configuración pendiente de Firebase.
+          El acceso se valida directamente contra Firebase Authentication.
         </div>
       </div>
     </form>
@@ -256,7 +256,7 @@
         <button class="ai-btn" id="runAiBtn">✨ Analizar con DeepSeek</button>
         <button class="ghost" id="exportBtn">⇩ Exportar PDF</button>
         <button class="primary" data-open="presupuesto">+ Presupuesto</button>
-        <button class="ghost danger" id="logoutBtn" title="Cerrar sesión">Salir</button>
+        <button class="ghost danger" id="logoutBtn" title="Cerrar sesión" onclick="window.__tiLogout && window.__tiLogout(event)">Salir</button>
       </div>
     </header>
 
@@ -741,16 +741,12 @@
     onAuthStateChanged(auth, user => {
       if (user) {
         unlockUI(user.email, false);
-      } else if (!sessionStorage.getItem('ti_bypass_session')) {
+      } else {
         authGate.style.display = 'flex';
         syncStatus.textContent = '○ Sesión no iniciada';
         syncStatus.style.color = 'var(--red)';
       }
     });
-  }
-
-  if (sessionStorage.getItem('ti_bypass_session')) {
-    unlockUI(sessionStorage.getItem('ti_bypass_session'), true);
   }
 
   // Botón Bypass / Contingencia
@@ -760,7 +756,7 @@
     unlockUI(email, true);
   });
 
-  // Login con Firebase (con auto-registro si no existe)
+  // Login estricto contra Firebase Authentication; no crea cuentas ni usa bypass.
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
     loginMsg.style.color = 'var(--blue)';
@@ -770,7 +766,7 @@
 
     if (!auth) {
       loginMsg.style.color = 'var(--red)';
-      loginMsg.textContent = 'Firebase no está inicializado. Usa el botón "Entrar en Modo Local / Bypass".';
+      loginMsg.textContent = 'Firebase no está inicializado. Abre la aplicación desde Vercel, localhost o HTTPS.';
       return;
     }
 
@@ -779,18 +775,7 @@
       loginMsg.textContent = '';
     } catch (err) {
       console.warn("Auth error:", err.code);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        loginMsg.textContent = 'Intentando registrar usuario en Firebase por primera vez...';
-        try {
-          await createUserWithEmailAndPassword(auth, email, pass);
-          loginMsg.style.color = 'var(--green)';
-          loginMsg.textContent = '¡Usuario creado y conectado!';
-        } catch (regErr) {
-          handleAuthError(regErr);
-        }
-      } else {
-        handleAuthError(err);
-      }
+      handleAuthError(err);
     }
   });
 
@@ -811,21 +796,19 @@
   function handleAuthError(err) {
     loginMsg.style.color = 'var(--red)';
     if (err.code === 'auth/operation-not-allowed') {
-      loginMsg.innerHTML = '<b>Error:</b> El método Email/Password no está habilitado en la consola de Firebase. <br>👉 <b>Usa el botón de abajo "Entrar en Modo Local / Bypass"</b> para continuar de inmediato sin trabas.';
+      loginMsg.innerHTML = '<b>Error:</b> El método Email/Password no está habilitado en Firebase Authentication.';
     } else if (err.code === 'auth/email-already-in-use') {
-      loginMsg.innerHTML = 'La cuenta ya existe pero la contraseña no coincide. Usa "Modo Local / Bypass" si necesitas entrar ya.';
+      loginMsg.innerHTML = 'El correo o la contraseña no son correctos.';
     } else {
-      loginMsg.innerHTML = `<b>Error (${err.code}):</b>${err.message}. <br>Puedes usar el botón "Entrar en Modo Local / Bypass".`;
+      loginMsg.innerHTML = `<b>Error (${err.code || 'desconocido'}):</b> ${err.message || 'No fue posible iniciar sesión.'}`;
     }
   }
 
   // Cerrar Sesión
   document.getElementById('logoutBtn').addEventListener('click', async () => {
-    if (confirm('¿Cerrar sesión del sistema?')) {
-      sessionStorage.removeItem('ti_bypass_session');
-      if (auth) await signOut(auth);
-      location.reload();
-    }
+    sessionStorage.removeItem('ti_bypass_session');
+    if (auth) await signOut(auth);
+    location.reload();
   });
 
   // MODO LOCAL / OFFLINE (FALLBACK 100% OPERATIVO)
@@ -1708,6 +1691,55 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
 
   const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('currentDateString').textContent = new Date().toLocaleDateString('es-MX', dateOptions);
+</script>
+<script type="module">
+  // Fallback de autenticación: garantiza que el formulario siga funcionando aunque
+  // otra parte opcional de la app falle al cargar.
+  import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+  const cfg = { apiKey:"AIzaSyBQ9f5pCq3KLRWxxDqdxMSMP0cQ1s1ZdnE", authDomain:"sistemas-milenium-mx.firebaseapp.com", projectId:"sistemas-milenium-mx", storageBucket:"sistemas-milenium-mx.firebasestorage.app", messagingSenderId:"221113269015", appId:"1:221113269015:web:c576d33c0ecd304c271552" };
+  const fallbackApp = getApps().length ? getApp() : initializeApp(cfg);
+  const fallbackAuth = getAuth(fallbackApp);
+  const form = document.getElementById('loginForm');
+  const gate = document.getElementById('authGate');
+  const msg = document.getElementById('loginMsg');
+  const status = document.getElementById('syncStatus');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    msg.style.color = 'var(--blue)'; msg.textContent = 'Verificando con Firebase...';
+    try {
+      const result = await signInWithEmailAndPassword(fallbackAuth, email, pass);
+      gate.style.display = 'none';
+      if (status) { status.textContent = '● Conectado a Firebase (' + result.user.email.split('@')[0] + ')'; status.style.color = 'var(--green)'; }
+      msg.textContent = '';
+    } catch (error) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') ? 'El correo o la contraseña no son correctos.' : 'Firebase: ' + (error.code || 'no fue posible iniciar sesión');
+    }
+  }, true);
+  onAuthStateChanged(fallbackAuth, user => {
+    if (user) gate.style.display = 'none';
+  });
+  window.__tiLogout = async (event) => {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    await signOut(fallbackAuth);
+    sessionStorage.removeItem('ti_bypass_session');
+    gate.style.display = 'flex';
+    document.getElementById('loginPass').value = '';
+    msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.';
+  };
+  document.getElementById('logoutBtn').addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    await signOut(fallbackAuth);
+    sessionStorage.removeItem('ti_bypass_session');
+    gate.style.display = 'flex';
+    document.getElementById('loginPass').value = '';
+    msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.';
+  }, true);
 </script>
 </body>
 </html>
