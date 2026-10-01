@@ -121,7 +121,6 @@
     .filters{display:flex;gap:10px;flex-wrap:wrap}
     .filters input,.filters select{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font-size:13px}
     
-    /* Configuración rápida en campos select */
     .field-with-config{display:flex;gap:8px;align-items:center}
     .field-with-config select{flex:1}
     .btn-config-field{background:#f0f0ee;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;color:#555}
@@ -146,8 +145,8 @@
     @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 
     /* Auth Gate */
-    #authGate{position:fixed;inset:0;background:rgba(18,18,18,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
-    .auth-box{background:#fff;border-radius:16px;padding:28px;width:min(440px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    #authGate{position:fixed;inset:0;background:rgba(18,18,18,.82);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+    .auth-box{background:#fff;border-radius:16px;padding:28px;width:min(450px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}
 
     @media(max-width:1024px){
       .sidebar{width:70px;padding:20px 8px}
@@ -168,12 +167,17 @@
 </head>
 <body>
 
-<!-- AUTENTICACIÓN FIREBASE COMPLETA (INICIO, CREACIÓN Y RECUPERACIÓN) -->
+<!-- AUTENTICACIÓN FIREBASE CON MODO BYPASS DE SEGURIDAD -->
 <div id="authGate">
   <div class="auth-box">
     <div class="eyebrow">Acceso Seguro Cloud</div>
     <h2 style="margin:6px 0 6px">Control TI · Finanzas e IA</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Inicia sesión con tu cuenta institucional o créala en el proyecto si es tu primer acceso.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Inicia sesión o utiliza el modo de contingencia si Firebase está en configuración.</p>
+    
+    <div id="fileProtocolAlert" style="display:none;background:#fff1df;border:1px solid #ffd8a8;border-radius:8px;padding:10px;font-size:12px;color:#a86605;margin-bottom:14px">
+      ⚠️ <b>Aviso de ejecución local:</b> Estás abriendo el archivo mediante <code>file:///</code>. Para autenticación directa de Firebase es recomendable servirlo vía <code>localhost</code> (o usa el botón de Bypass abajo para trabajar de inmediato).
+    </div>
+
     <form id="loginForm" class="form">
       <label>Correo Electrónico
         <input id="loginEmail" type="email" required value="lnoriega@mileniumgasolineras.com" autocomplete="email">
@@ -182,13 +186,19 @@
         <input id="loginPass" type="password" required value="Luna1309" autocomplete="current-password">
       </label>
       <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="primary" type="submit" style="flex:1" id="loginBtn">Entrar</button>
-        <button class="ghost" id="registerBtn" type="button" title="Crea el usuario en Firebase Authentication de inmediato">Crear cuenta</button>
+        <button class="primary" type="submit" style="flex:1" id="loginBtn">Entrar con Firebase</button>
+        <button class="ghost" id="registerBtn" type="button" title="Forzar creación en Firebase Authentication">Crear en Firebase</button>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-        <button type="button" id="resetPassBtn" class="ghost" style="border:0;padding:0;font-size:12px;color:var(--orange);text-decoration:underline">¿Olvidaste tu contraseña?</button>
+      <div id="loginMsg" style="font-size:12px;margin-top:8px;line-height:1.4"></div>
+      
+      <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:14px;display:flex;flex-direction:column;gap:8px">
+        <button type="button" id="bypassBtn" class="ghost" style="background:#f4f4f1;font-weight:700;color:var(--ink)">
+          ⚡ Entrar en Modo Local / Bypass
+        </button>
+        <div style="font-size:11px;color:var(--muted);text-align:center">
+          Te permite ingresar de inmediato sin bloqueos de red o configuración pendiente de Firebase.
+        </div>
       </div>
-      <div id="loginMsg" style="font-size:12px;margin-top:6px"></div>
     </form>
   </div>
 </div>
@@ -230,8 +240,8 @@
       </button>
     </nav>
     <div class="side-note">
-      <b>Sincronización Cloud</b><br/>
-      <span id="syncStatus" style="color:var(--orange)">● Conectando a Firebase...</span>
+      <b>Estado de Conexión</b><br/>
+      <span id="syncStatus" style="color:var(--orange)">● Verificando...</span>
     </div>
   </aside>
 
@@ -372,7 +382,7 @@
         </div>
       </div>
 
-      <!-- 2. PRESUPUESTO (COMPLETO CON PROVEEDOR, PRODUCTO, COSTO, FECHA PAGO, UBICACIÓN, CLASIFICACIÓN, CONCEPTO) -->
+      <!-- 2. PRESUPUESTO -->
       <div class="view" id="presupuesto">
         <div class="module-head">
           <div>
@@ -534,7 +544,7 @@
         </div>
       </div>
 
-      <!-- 6. CATÁLOGOS Y OPCIONES (EDITAR, AGREGAR, ELIMINAR OPCIONES DE CADA SELECT) -->
+      <!-- 6. CATÁLOGOS Y OPCIONES -->
       <div class="view" id="catalogos">
         <div class="module-head">
           <div>
@@ -618,7 +628,7 @@
 
 <div class="toast" id="toast">Operación exitosa</div>
 
-<!-- FIREBASE SDK V12 MODULAR OFICIAL -->
+<!-- FIREBASE SDK V12 MODULAR + MODO OFFLINE / BYPASS RESILIENTE -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
   import { 
@@ -628,10 +638,14 @@
     getAuth, 
     signInWithEmailAndPassword, 
     createUserWithEmailAndPassword, 
-    sendPasswordResetEmail, 
     signOut, 
     onAuthStateChanged 
   } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+
+  // Verificación de protocolo local
+  if (window.location.protocol === 'file:') {
+    document.getElementById('fileProtocolAlert').style.display = 'block';
+  }
 
   // CONFIGURACIÓN OFICIAL FIREBASE
   const firebaseConfig = {
@@ -643,28 +657,34 @@
     appId: "1:221113269015:web:c576d33c0ecd304c271552"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
+  let app, db, auth;
+  let isLocalMode = false;
+
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+  } catch (err) {
+    console.warn("Error inicializando Firebase:", err);
+  }
 
   // ESTADO LOCAL DE DATOS Y CATÁLOGOS
   const STORE = {
-    presupuestos: [],
-    pagos: [],
-    incidencias: [],
-    activos: [],
-    catalogos: {
+    presupuestos: JSON.parse(localStorage.getItem('ti_presupuestos') || '[]'),
+    pagos: JSON.parse(localStorage.getItem('ti_pagos') || '[]'),
+    incidencias: JSON.parse(localStorage.getItem('ti_incidencias') || '[]'),
+    activos: JSON.parse(localStorage.getItem('ti_activos') || '[]'),
+    catalogos: JSON.parse(localStorage.getItem('ti_catalogos') || JSON.stringify({
       categorias: ["Servicios Cloud", "Licencias & Software", "Equipamiento & Hardware", "Soporte Externo & Consultoría", "Telecomunicaciones & Enlaces"],
       ubicaciones: ["Estación Matriz", "Sucursal Norte", "Sucursal Reynosa", "Sucursal Cosmópolis", "Site Central / Data Center"],
       clasificaciones: ["Gasto Operativo (OPEX)", "Inversión de Capital (CAPEX)", "Renovación Anual", "Mantenimiento Preventivo"],
       areas: ["Redes e Infraestructura", "Sistemas y CONTPAQi", "Accesos y Permisos", "Soporte a Estaciones", "Seguridad Informática"],
       tipos_activo: ["Equipo de Cómputo", "Servidor / Redes", "Dispositivo Móvil", "Impresora / Periférico", "Licencia de Software"]
-    }
+    }))
   };
 
   let activeModalType = 'presupuesto';
 
-  // UTILIDADES
   const fmtMoney = num => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(num || 0);
   const showToast = msg => {
     const t = document.getElementById('toast');
@@ -696,105 +716,148 @@
 
   navBtns.forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
 
-  // AUTHENTICATION FLOW
+  // AUTHENTICATION & BYPASS FLOW
   const authGate = document.getElementById('authGate');
   const loginForm = document.getElementById('loginForm');
   const loginMsg = document.getElementById('loginMsg');
   const syncStatus = document.getElementById('syncStatus');
 
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      authGate.style.display = 'none';
-      syncStatus.innerHTML = '● Conectado: <b>' + (user.email.split('@')[0]) + '</b>';
+  function unlockUI(userEmail, local = false) {
+    isLocalMode = local;
+    authGate.style.display = 'none';
+    if (local) {
+      syncStatus.innerHTML = '● Modo Local / Offline (<b>' + userEmail + '</b>)';
+      syncStatus.style.color = 'var(--yellow)';
+      initLocalState();
+    } else {
+      syncStatus.innerHTML = '● Conectado a Firebase (<b>' + userEmail.split('@')[0] + '</b>)';
       syncStatus.style.color = 'var(--green)';
       initRealtime();
-    } else {
-      authGate.style.display = 'flex';
-      syncStatus.textContent = '○ Sesión no iniciada';
-      syncStatus.style.color = 'var(--red)';
     }
+  }
+
+  // Comprobar si ya había sesión iniciada
+  if (auth) {
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        unlockUI(user.email, false);
+      } else if (!sessionStorage.getItem('ti_bypass_session')) {
+        authGate.style.display = 'flex';
+        syncStatus.textContent = '○ Sesión no iniciada';
+        syncStatus.style.color = 'var(--red)';
+      }
+    });
+  }
+
+  if (sessionStorage.getItem('ti_bypass_session')) {
+    unlockUI(sessionStorage.getItem('ti_bypass_session'), true);
+  }
+
+  // Botón Bypass / Contingencia
+  document.getElementById('bypassBtn').addEventListener('click', () => {
+    const email = document.getElementById('loginEmail').value.trim() || 'lnoriega@mileniumgasolineras.com';
+    sessionStorage.setItem('ti_bypass_session', email);
+    unlockUI(email, true);
   });
 
-  // Iniciar Sesión Normal
+  // Login con Firebase (con auto-registro si no existe)
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
-    loginMsg.style.color = 'var(--muted)';
-    loginMsg.textContent = 'Autenticando credenciales...';
+    loginMsg.style.color = 'var(--blue)';
+    loginMsg.textContent = 'Verificando con Firebase...';
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value.trim();
+
+    if (!auth) {
+      loginMsg.style.color = 'var(--red)';
+      loginMsg.textContent = 'Firebase no está inicializado. Usa el botón "Entrar en Modo Local / Bypass".';
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, pass);
       loginMsg.textContent = '';
     } catch (err) {
-      loginMsg.style.color = 'var(--red)';
+      console.warn("Auth error:", err.code);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        loginMsg.innerHTML = 'Usuario o contraseña incorrectos. Si no lo has registrado aún en Firebase, haz clic en el botón <b>"Crear cuenta"</b>.';
+        loginMsg.textContent = 'Intentando registrar usuario en Firebase por primera vez...';
+        try {
+          await createUserWithEmailAndPassword(auth, email, pass);
+          loginMsg.style.color = 'var(--green)';
+          loginMsg.textContent = '¡Usuario creado y conectado!';
+        } catch (regErr) {
+          handleAuthError(regErr);
+        }
       } else {
-        loginMsg.textContent = 'Error: ' + err.message;
+        handleAuthError(err);
       }
     }
   });
 
-  // Botón Crear Cuenta (Registra en Firebase Authentication de inmediato)
   document.getElementById('registerBtn').addEventListener('click', async () => {
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value.trim();
-    if (!email || !pass) {
-      alert('Ingresa el correo y la contraseña a registrar.');
-      return;
-    }
     loginMsg.style.color = 'var(--blue)';
-    loginMsg.textContent = 'Registrando cuenta en Firebase Authentication...';
+    loginMsg.textContent = 'Creando usuario en Firebase Authentication...';
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
       loginMsg.style.color = 'var(--green)';
-      loginMsg.textContent = '¡Cuenta creada y autenticada con éxito!';
+      loginMsg.textContent = '¡Cuenta creada!';
     } catch (err) {
-      loginMsg.style.color = 'var(--red)';
-      if (err.code === 'auth/email-already-in-use') {
-        loginMsg.textContent = 'Esta cuenta ya existe en Firebase. La contraseña ingresada no coincide o puedes pulsar "¿Olvidaste tu contraseña?".';
-      } else if (err.code === 'auth/weak-password') {
-        loginMsg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-      } else {
-        loginMsg.textContent = 'Error: ' + err.message;
-      }
+      handleAuthError(err);
     }
   });
 
-  // Botón Olvidé mi Contraseña
-  document.getElementById('resetPassBtn').addEventListener('click', async () => {
-    const email = document.getElementById('loginEmail').value.trim();
-    if (!email) {
-      alert('Por favor escribe tu correo electrónico en el campo superior.');
-      return;
+  function handleAuthError(err) {
+    loginMsg.style.color = 'var(--red)';
+    if (err.code === 'auth/operation-not-allowed') {
+      loginMsg.innerHTML = '<b>Error:</b> El método Email/Password no está habilitado en la consola de Firebase. <br>👉 <b>Usa el botón de abajo "Entrar en Modo Local / Bypass"</b> para continuar de inmediato sin trabas.';
+    } else if (err.code === 'auth/email-already-in-use') {
+      loginMsg.innerHTML = 'La cuenta ya existe pero la contraseña no coincide. Usa "Modo Local / Bypass" si necesitas entrar ya.';
+    } else {
+      loginMsg.innerHTML = `<b>Error (${err.code}):</b>${err.message}. <br>Puedes usar el botón "Entrar en Modo Local / Bypass".`;
     }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      alert('Se envió un correo a ' + email + ' con las instrucciones para restablecer tu contraseña.');
-    } catch (err) {
-      alert('No se pudo enviar el correo de recuperación: ' + err.message);
-    }
-  });
+  }
 
   // Cerrar Sesión
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     if (confirm('¿Cerrar sesión del sistema?')) {
-      await signOut(auth);
+      sessionStorage.removeItem('ti_bypass_session');
+      if (auth) await signOut(auth);
       location.reload();
     }
   });
 
-  // GESTIÓN DE CATÁLOGOS EN FIRESTORE
+  // MODO LOCAL / OFFLINE (FALLBACK 100% OPERATIVO)
+  function initLocalState() {
+    populateAllDropdowns();
+    renderPresupuestos();
+    renderPagos();
+    renderIncidencias();
+    renderActivos();
+    recalcKPIsAndDashboard();
+  }
+
+  function saveLocalData(key) {
+    localStorage.setItem('ti_' + key, JSON.stringify(STORE[key]));
+    recalcKPIsAndDashboard();
+  }
+
+  // CATÁLOGOS
   async function initCatalogs() {
     const catDocRef = doc(db, 'configuracion', 'catalogos');
     onSnapshot(catDocRef, snap => {
       if (snap.exists()) {
         STORE.catalogos = { ...STORE.catalogos, ...snap.data() };
+        localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
       } else {
         setDoc(catDocRef, STORE.catalogos);
       }
       populateAllDropdowns();
       if (document.getElementById('catalogos').classList.contains('active')) renderCatalogTable();
+    }, err => {
+      console.warn("Fallo lectura catalogos cloud, usando local:", err);
+      populateAllDropdowns();
     });
   }
 
@@ -821,35 +884,36 @@
     populateDropdown(document.getElementById('filterActUbicacion'), STORE.catalogos.ubicaciones, "Todas las ubicaciones");
   }
 
-  // SUSCRIPCIONES EN TIEMPO REAL A FIRESTORE
+  // SUSCRIPCIONES A FIRESTORE
   function initRealtime() {
     initCatalogs();
 
     onSnapshot(collection(db, 'presupuestos'), snap => {
       STORE.presupuestos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      saveLocalData('presupuestos');
       renderPresupuestos();
-      recalcKPIsAndDashboard();
-    });
+    }, () => initLocalState());
 
     onSnapshot(collection(db, 'pagos'), snap => {
       STORE.pagos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      saveLocalData('pagos');
       renderPagos();
-      recalcKPIsAndDashboard();
-    });
+    }, () => initLocalState());
 
     onSnapshot(collection(db, 'incidencias'), snap => {
       STORE.incidencias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      saveLocalData('incidencias');
       renderIncidencias();
-      recalcKPIsAndDashboard();
-    });
+    }, () => initLocalState());
 
     onSnapshot(collection(db, 'activos'), snap => {
       STORE.activos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      saveLocalData('activos');
       renderActivos();
-    });
+    }, () => initLocalState());
   }
 
-  // CÁLCULOS DE KPIS Y DASHBOARD
+  // CÁLCULOS GENERALES DE KPIS Y DASHBOARD
   function recalcKPIsAndDashboard() {
     const totalPresupuesto = STORE.presupuestos.reduce((acc, p) => acc + (Number(p.costo) || 0), 0);
     const totalGasto = STORE.pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
@@ -955,7 +1019,7 @@
     }
   }
 
-  // RENDERIZADO: PRESUPUESTOS (DETALLADO)
+  // RENDERIZADO: PRESUPUESTOS
   function renderPresupuestos() {
     const q = (document.getElementById('filterPresQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPresCategoria').value;
@@ -1142,7 +1206,8 @@
     if (!val) return;
     if (!STORE.catalogos[key].includes(val)) {
       STORE.catalogos[key].push(val);
-      await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
+      localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+      if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
       input.value = '';
       showToast('Opción agregada al catálogo');
       renderCatalogTable();
@@ -1155,7 +1220,8 @@
   window.deleteCatalogItem = async (key, index) => {
     if (confirm(`¿Eliminar "${STORE.catalogos[key][index]}" del catálogo?`)) {
       STORE.catalogos[key].splice(index, 1);
-      await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
+      localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+      if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
       showToast('Opción eliminada');
       renderCatalogTable();
       populateAllDropdowns();
@@ -1167,7 +1233,8 @@
     const newVal = prompt('Modifica el nombre de la opción:', current);
     if (newVal && newVal.trim() && newVal !== current) {
       STORE.catalogos[key][index] = newVal.trim();
-      await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
+      localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+      if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos);
       showToast('Opción actualizada');
       renderCatalogTable();
       populateAllDropdowns();
@@ -1342,12 +1409,12 @@
   document.getElementById('modalCancel').onclick = closeModal;
   modal.onclick = e => { if (e.target === modal) closeModal(); };
 
-  // GUARDADO DINÁMICO EN FIRESTORE
+  // GUARDADO DINÁMICO
   document.getElementById('dynamicForm').addEventListener('submit', async e => {
     e.preventDefault();
     const btn = document.getElementById('modalSubmitBtn');
     btn.disabled = true;
-    btn.textContent = 'Guardando en Firebase...';
+    btn.textContent = 'Guardando...';
 
     const formData = new FormData(e.target);
     const data = {};
@@ -1357,21 +1424,31 @@
     if (data.monto) data.monto = parseFloat(data.monto) || 0;
     if (activeModalType === 'incidencia') data.estado = data.estado || 'Abierta';
     data.updatedAt = new Date().toISOString();
+    data.id = 'loc_' + Date.now();
 
     const targetCollection = activeModalType === 'presupuesto' ? 'presupuestos'
       : activeModalType === 'pago' ? 'pagos'
       : activeModalType === 'incidencia' ? 'incidencias' : 'activos';
 
     try {
-      await addDoc(collection(db, targetCollection), {
-        ...data,
-        createdAt: new Date().toISOString()
-      });
+      if (!isLocalMode && db) {
+        await addDoc(collection(db, targetCollection), {
+          ...data,
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        STORE[targetCollection].unshift({ ...data, createdAt: new Date().toISOString() });
+        saveLocalData(targetCollection);
+        if (targetCollection === 'presupuestos') renderPresupuestos();
+        if (targetCollection === 'pagos') renderPagos();
+        if (targetCollection === 'incidencias') renderIncidencias();
+        if (targetCollection === 'activos') renderActivos();
+      }
       showToast('Registro guardado con éxito');
       closeModal();
       e.target.reset();
     } catch (err) {
-      alert('Error en Firestore: ' + err.message);
+      alert('Error: ' + err.message);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Guardar Registro';
@@ -1380,9 +1457,18 @@
 
   // MÉTODOS GLOBALES PARA EL DOM
   window.deleteRecord = async (colName, id) => {
-    if (confirm('¿Deseas eliminar este registro de la base de datos de forma permanente?')) {
+    if (confirm('¿Deseas eliminar este registro de forma permanente?')) {
       try {
-        await deleteDoc(doc(db, colName, id));
+        if (!isLocalMode && db) {
+          await deleteDoc(doc(db, colName, id));
+        } else {
+          STORE[colName] = STORE[colName].filter(x => x.id !== id);
+          saveLocalData(colName);
+          if (colName === 'presupuestos') renderPresupuestos();
+          if (colName === 'pagos') renderPagos();
+          if (colName === 'incidencias') renderIncidencias();
+          if (colName === 'activos') renderActivos();
+        }
         showToast('Registro eliminado');
       } catch (err) {
         alert('No se pudo eliminar: ' + err.message);
@@ -1392,10 +1478,20 @@
 
   window.toggleResolveIncident = async id => {
     try {
-      await updateDoc(doc(db, 'incidencias', id), {
-        estado: 'Resuelta',
-        resolvedAt: new Date().toISOString()
-      });
+      if (!isLocalMode && db) {
+        await updateDoc(doc(db, 'incidencias', id), {
+          estado: 'Resuelta',
+          resolvedAt: new Date().toISOString()
+        });
+      } else {
+        const item = STORE.incidencias.find(i => i.id === id);
+        if (item) {
+          item.estado = 'Resuelta';
+          item.resolvedAt = new Date().toISOString();
+          saveLocalData('incidencias');
+          renderIncidencias();
+        }
+      }
       showToast('Ticket cerrado como Resuelto');
     } catch (err) {
       alert('Error al actualizar: ' + err.message);
@@ -1407,7 +1503,7 @@
     if (!item) return;
     if (confirm(`¿Marcar la partida "${item.producto}" (${fmtMoney(item.costo)}) como Pagada y transferirla a Pagos Realizados?`)) {
       try {
-        await addDoc(collection(db, 'pagos'), {
+        const pagoObj = {
           proveedor: item.proveedor,
           concepto: `${item.producto} -${item.concepto || ''}`,
           monto: item.costo,
@@ -1415,8 +1511,17 @@
           ubicacion: item.ubicacion,
           fecha: new Date().toISOString().split('T')[0],
           estado: 'Pagado',
-          createdAt: new Date().toISOString()
-        });
+          createdAt: new Date().toISOString(),
+          id: 'pay_' + Date.now()
+        };
+
+        if (!isLocalMode && db) {
+          await addDoc(collection(db, 'pagos'), pagoObj);
+        } else {
+          STORE.pagos.unshift(pagoObj);
+          saveLocalData('pagos');
+          renderPagos();
+        }
         showToast('Pago registrado correctamente');
       } catch (err) {
         alert('Error: ' + err.message);
@@ -1477,9 +1582,9 @@
       }))
     };
 
-    const systemPrompt = `Eres un Director de TI y Auditor Financiero de Tecnología de alto nivel.
-Analiza la siguiente información de presupuestos, gastos reales por ubicación y tickets de soporte en formato JSON.
-Entrega un resumen ejecutivo conciso, altamente accionable y estructurado en HTML limpio (usa <ul>, <li>, <b>, etiquetas de alerta con estilo si es necesario, sin bloques markdown \`\`\`html):
+    const systemPrompt = `Eres un Director de TI y Auditor Financiero de Tecnología.
+Analiza los datos de presupuestos, gastos reales por ubicación y tickets de soporte en formato JSON.
+Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, sin bloques markdown \`\`\`html):
 1. **Diagnóstico Presupuestal y Riesgos de Liquidez**: Identifica partidas con fecha de vencimiento próxima, concentración de costos por proveedor o ubicación y balance respecto a lo pagado.
 2. **Salud de la Operación y Soporte**: Evalúa las incidencias críticas y qué áreas concentran mayor problema.
 3. **3 Acciones Inmediatas de Optimización**: Pasos concretos para reducir costos en licencias/servicios y mejorar SLAs.`;
@@ -1511,7 +1616,7 @@ Entrega un resumen ejecutivo conciso, altamente accionable y estructurado en HTM
       aiOutput.innerHTML = text;
       showToast('Análisis IA completado');
     } catch (err) {
-      aiOutput.innerHTML = `<span style="color:var(--red)"><b>Error al conectar con la API de DeepSeek:</b> ${err.message}. Verifica que tu API Key cuente con saldo/créditos en la plataforma DeepSeek.</span>`;
+      aiOutput.innerHTML = `<span style="color:var(--red)"><b>Error al conectar con la API de DeepSeek:</b> ${err.message}</span>`;
     }
   });
 
@@ -1601,7 +1706,6 @@ Entrega un resumen ejecutivo conciso, altamente accionable y estructurado en HTM
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   });
 
-  // FECHA DINÁMICA
   const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('currentDateString').textContent = new Date().toLocaleDateString('es-MX', dateOptions);
 </script>
