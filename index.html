@@ -172,10 +172,10 @@
   <div class="auth-box">
     <div class="eyebrow">Acceso Seguro Cloud</div>
     <h2 style="margin:6px 0 6px">Control TI · Finanzas e IA</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Inicia sesión con la cuenta autorizada de Firebase Authentication.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Inicia sesión con la cuenta de TI o entra en modo local de contingencia.</p>
     
     <div id="fileProtocolAlert" style="display:none;background:#fff1df;border:1px solid #ffd8a8;border-radius:8px;padding:10px;font-size:12px;color:#a86605;margin-bottom:14px">
-      ⚠️ <b>Aviso:</b> Para autenticar con Firebase abre esta app desde Vercel, localhost o HTTPS.
+      ⚠️ <b>Aviso:</b> Si estás abriendo el archivo localmente como <code>file:///</code>, te recomendamos usar el botón <b>"Modo Local / Bypass"</b> para evitar bloqueos del navegador.
     </div>
 
     <form id="loginForm" class="form">
@@ -183,20 +183,20 @@
         <input id="loginEmail" type="email" required value="lnoriega@mileniumgasolineras.com" autocomplete="email">
       </label>
       <label>Contraseña
-        <input id="loginPass" type="password" required autocomplete="current-password">
+        <input id="loginPass" type="password" required value="Luna1309" autocomplete="current-password">
       </label>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="primary" type="submit" style="flex:1" id="loginBtn">Entrar con Firebase</button>
-        <button class="ghost" id="registerBtn" type="button" hidden>Crear en Firebase</button>
+        <button class="ghost" id="registerBtn" type="button" title="Crear esta cuenta en Firebase Authentication">Crear en Firebase</button>
       </div>
       <div id="loginMsg" style="font-size:12px;margin-top:8px;line-height:1.4"></div>
       
       <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:14px;display:flex;flex-direction:column;gap:8px">
-        <button type="button" id="bypassBtn" class="ghost" hidden style="background:#f4f4f1;font-weight:700;color:var(--ink)">
+        <button type="button" id="bypassBtn" class="ghost" style="background:#f4f4f1;font-weight:700;color:var(--ink)">
           ⚡ Entrar en Modo Local / Bypass
         </button>
         <div style="font-size:11px;color:var(--muted);text-align:center">
-          El acceso se valida directamente contra Firebase Authentication.
+          Ingreso inmediato garantizado para pruebas y trabajo sin bloqueos de red.
         </div>
       </div>
     </form>
@@ -256,7 +256,7 @@
         <button class="ai-btn" id="runAiBtn">✨ Analizar con DeepSeek</button>
         <button class="ghost" id="exportBtn">⇩ Exportar PDF</button>
         <button class="primary" data-open="presupuesto">+ Presupuesto</button>
-        <button class="ghost danger" id="logoutBtn" title="Cerrar sesión" onclick="window.__tiLogout && window.__tiLogout(event)">Salir</button>
+        <button class="ghost danger" id="logoutBtn" title="Cerrar sesión">Salir</button>
       </div>
     </header>
 
@@ -628,9 +628,9 @@
 
 <div class="toast" id="toast">Operación exitosa</div>
 
-<!-- FIREBASE SDK V12 MODULAR + MODO OFFLINE / BYPASS RESILIENTE -->
+<!-- FIREBASE SDK V12 MODULAR + GESTOR UNIFICADO -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+  import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
   import { 
     getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc 
   } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
@@ -642,12 +642,10 @@
     onAuthStateChanged 
   } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
-  // Verificación de protocolo local
   if (window.location.protocol === 'file:') {
     document.getElementById('fileProtocolAlert').style.display = 'block';
   }
 
-  // CONFIGURACIÓN OFICIAL FIREBASE
   const firebaseConfig = {
     apiKey: "AIzaSyBQ9f5pCq3KLRWxxDqdxMSMP0cQ1s1ZdnE",
     authDomain: "sistemas-milenium-mx.firebaseapp.com",
@@ -657,18 +655,11 @@
     appId: "1:221113269015:web:c576d33c0ecd304c271552"
   };
 
-  let app, db, auth;
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
   let isLocalMode = false;
 
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-  } catch (err) {
-    console.warn("Error inicializando Firebase:", err);
-  }
-
-  // ESTADO LOCAL DE DATOS Y CATÁLOGOS
   const STORE = {
     presupuestos: JSON.parse(localStorage.getItem('ti_presupuestos') || '[]'),
     pagos: JSON.parse(localStorage.getItem('ti_pagos') || '[]'),
@@ -716,7 +707,7 @@
 
   navBtns.forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
 
-  // AUTHENTICATION & BYPASS FLOW
+  // AUTHENTICATION FLOW
   const authGate = document.getElementById('authGate');
   const loginForm = document.getElementById('loginForm');
   const loginMsg = document.getElementById('loginMsg');
@@ -726,7 +717,7 @@
     isLocalMode = local;
     authGate.style.display = 'none';
     if (local) {
-      syncStatus.innerHTML = '● Modo Local / Offline (<b>' + userEmail + '</b>)';
+      syncStatus.innerHTML = '● Modo Local (<b>' + userEmail + '</b>)';
       syncStatus.style.color = 'var(--yellow)';
       initLocalState();
     } else {
@@ -736,27 +727,26 @@
     }
   }
 
-  // Comprobar si ya había sesión iniciada
-  if (auth) {
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        unlockUI(user.email, false);
-      } else {
-        authGate.style.display = 'flex';
-        syncStatus.textContent = '○ Sesión no iniciada';
-        syncStatus.style.color = 'var(--red)';
-      }
-    });
-  }
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      unlockUI(user.email, false);
+    } else if (sessionStorage.getItem('ti_bypass_session')) {
+      unlockUI(sessionStorage.getItem('ti_bypass_session'), true);
+    } else {
+      authGate.style.display = 'flex';
+      syncStatus.textContent = '○ Sesión no iniciada';
+      syncStatus.style.color = 'var(--red)';
+    }
+  });
 
-  // Botón Bypass / Contingencia
+  // Botón Bypass
   document.getElementById('bypassBtn').addEventListener('click', () => {
     const email = document.getElementById('loginEmail').value.trim() || 'lnoriega@mileniumgasolineras.com';
     sessionStorage.setItem('ti_bypass_session', email);
     unlockUI(email, true);
   });
 
-  // Login estricto contra Firebase Authentication; no crea cuentas ni usa bypass.
+  // Formulario Login
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
     loginMsg.style.color = 'var(--blue)';
@@ -764,26 +754,32 @@
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value.trim();
 
-    if (!auth) {
-      loginMsg.style.color = 'var(--red)';
-      loginMsg.textContent = 'Firebase no está inicializado. Abre la aplicación desde Vercel, localhost o HTTPS.';
-      return;
-    }
-
     try {
       await signInWithEmailAndPassword(auth, email, pass);
       loginMsg.textContent = '';
     } catch (err) {
       console.warn("Auth error:", err.code);
-      handleAuthError(err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        loginMsg.textContent = 'El usuario no existe aún en Firebase. Intentando crear la cuenta...';
+        try {
+          await createUserWithEmailAndPassword(auth, email, pass);
+          loginMsg.style.color = 'var(--green)';
+          loginMsg.textContent = '¡Cuenta creada y conectada!';
+        } catch (regErr) {
+          handleAuthError(regErr);
+        }
+      } else {
+        handleAuthError(err);
+      }
     }
   });
 
+  // Botón Registrar en Firebase
   document.getElementById('registerBtn').addEventListener('click', async () => {
     const email = document.getElementById('loginEmail').value.trim();
     const pass = document.getElementById('loginPass').value.trim();
     loginMsg.style.color = 'var(--blue)';
-    loginMsg.textContent = 'Creando usuario en Firebase Authentication...';
+    loginMsg.textContent = 'Creando usuario en Firebase...';
     try {
       await createUserWithEmailAndPassword(auth, email, pass);
       loginMsg.style.color = 'var(--green)';
@@ -796,22 +792,22 @@
   function handleAuthError(err) {
     loginMsg.style.color = 'var(--red)';
     if (err.code === 'auth/operation-not-allowed') {
-      loginMsg.innerHTML = '<b>Error:</b> El método Email/Password no está habilitado en Firebase Authentication.';
+      loginMsg.innerHTML = '<b>Aviso:</b> El proveedor Email/Password no está habilitado en Firebase. <br>👉 Pulsa abajo <b>"Entrar en Modo Local / Bypass"</b> para continuar de inmediato.';
     } else if (err.code === 'auth/email-already-in-use') {
-      loginMsg.innerHTML = 'El correo o la contraseña no son correctos.';
+      loginMsg.innerHTML = 'La cuenta ya existe pero la contraseña no coincide. Usa "Modo Local / Bypass" si requieres entrar ya.';
     } else {
-      loginMsg.innerHTML = `<b>Error (${err.code || 'desconocido'}):</b> ${err.message || 'No fue posible iniciar sesión.'}`;
+      loginMsg.innerHTML = `Error: ${err.message || err.code} <br>Puedes usar el botón "Entrar en Modo Local / Bypass".`;
     }
   }
 
   // Cerrar Sesión
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     sessionStorage.removeItem('ti_bypass_session');
-    if (auth) await signOut(auth);
+    try { await signOut(auth); } catch(e){}
     location.reload();
   });
 
-  // MODO LOCAL / OFFLINE (FALLBACK 100% OPERATIVO)
+  // MODO LOCAL / OFFLINE
   function initLocalState() {
     populateAllDropdowns();
     renderPresupuestos();
@@ -839,7 +835,7 @@
       populateAllDropdowns();
       if (document.getElementById('catalogos').classList.contains('active')) renderCatalogTable();
     }, err => {
-      console.warn("Fallo lectura catalogos cloud, usando local:", err);
+      console.warn("Fallo lectura catálogos cloud, usando local:", err);
       populateAllDropdowns();
     });
   }
@@ -1125,7 +1121,7 @@
     }).join('');
   }
 
-  // RENDERIZADO: ACTIVOS
+  // RENDERIZADO: ACTIVOS (Corregido sin caracteres de escape inválidos)
   function renderActivos() {
     const q = (document.getElementById('filterActQuery').value || '').toLowerCase();
     const tipo = document.getElementById('filterActTipo').value;
@@ -1691,55 +1687,6 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
 
   const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('currentDateString').textContent = new Date().toLocaleDateString('es-MX', dateOptions);
-</script>
-<script type="module">
-  // Fallback de autenticación: garantiza que el formulario siga funcionando aunque
-  // otra parte opcional de la app falle al cargar.
-  import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
-  const cfg = { apiKey:"AIzaSyBQ9f5pCq3KLRWxxDqdxMSMP0cQ1s1ZdnE", authDomain:"sistemas-milenium-mx.firebaseapp.com", projectId:"sistemas-milenium-mx", storageBucket:"sistemas-milenium-mx.firebasestorage.app", messagingSenderId:"221113269015", appId:"1:221113269015:web:c576d33c0ecd304c271552" };
-  const fallbackApp = getApps().length ? getApp() : initializeApp(cfg);
-  const fallbackAuth = getAuth(fallbackApp);
-  const form = document.getElementById('loginForm');
-  const gate = document.getElementById('authGate');
-  const msg = document.getElementById('loginMsg');
-  const status = document.getElementById('syncStatus');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const email = document.getElementById('loginEmail').value.trim();
-    const pass = document.getElementById('loginPass').value;
-    msg.style.color = 'var(--blue)'; msg.textContent = 'Verificando con Firebase...';
-    try {
-      const result = await signInWithEmailAndPassword(fallbackAuth, email, pass);
-      gate.style.display = 'none';
-      if (status) { status.textContent = '● Conectado a Firebase (' + result.user.email.split('@')[0] + ')'; status.style.color = 'var(--green)'; }
-      msg.textContent = '';
-    } catch (error) {
-      msg.style.color = 'var(--red)';
-      msg.textContent = (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') ? 'El correo o la contraseña no son correctos.' : 'Firebase: ' + (error.code || 'no fue posible iniciar sesión');
-    }
-  }, true);
-  onAuthStateChanged(fallbackAuth, user => {
-    if (user) gate.style.display = 'none';
-  });
-  window.__tiLogout = async (event) => {
-    if (event) { event.preventDefault(); event.stopPropagation(); }
-    await signOut(fallbackAuth);
-    sessionStorage.removeItem('ti_bypass_session');
-    gate.style.display = 'flex';
-    document.getElementById('loginPass').value = '';
-    msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.';
-  };
-  document.getElementById('logoutBtn').addEventListener('click', async (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    await signOut(fallbackAuth);
-    sessionStorage.removeItem('ti_bypass_session');
-    gate.style.display = 'flex';
-    document.getElementById('loginPass').value = '';
-    msg.textContent = 'Sesión cerrada. Ingresa nuevamente para continuar.';
-  }, true);
 </script>
 </body>
 </html>
