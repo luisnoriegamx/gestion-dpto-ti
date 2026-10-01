@@ -1772,9 +1772,13 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
   // otra parte opcional de la app falle al cargar.
   import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
   const cfg = { apiKey:"AIzaSyBQ9f5pCq3KLRWxxDqdxMSMP0cQ1s1ZdnE", authDomain:"sistemas-milenium-mx.firebaseapp.com", projectId:"sistemas-milenium-mx", storageBucket:"sistemas-milenium-mx.firebasestorage.app", messagingSenderId:"221113269015", appId:"1:221113269015:web:c576d33c0ecd304c271552" };
   const fallbackApp = getApps().length ? getApp() : initializeApp(cfg);
   const fallbackAuth = getAuth(fallbackApp);
+  const fallbackDb = getFirestore(fallbackApp);
+  window.__tiAddRecord = async (collectionName, data) => addDoc(collection(fallbackDb, collectionName), {...data, createdAt:new Date().toISOString()});
+  window.__tiSaveCatalogs = async catalogs => setDoc(doc(fallbackDb, 'configuracion', 'catalogos'), catalogs, {merge:true});
   const form = document.getElementById('loginForm');
   const gate = document.getElementById('authGate');
   const msg = document.getElementById('loginMsg');
@@ -1877,6 +1881,19 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
     }
     setTimeout(renderLocalCatalog, 300);
     document.getElementById('catalogSelector')?.addEventListener('change', renderLocalCatalog);
+    document.addEventListener('click', async e => {
+      const add = e.target.closest && e.target.closest('#addCatalogItemBtn');
+      if (!add) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const input=document.getElementById('newCatalogItemInput'), selector=document.getElementById('catalogSelector');
+      const value=input?.value.trim(); if(!value) { alert('Escribe una opción antes de agregar.'); return; }
+      const cats=JSON.parse(localStorage.getItem('ti_catalogos')||'{}'), key=selector?.value||'categorias'; cats[key]=cats[key]||[];
+      if(cats[key].includes(value)){ alert('Esa opción ya existe.'); return; }
+      cats[key].push(value); localStorage.setItem('ti_catalogos',JSON.stringify(cats));
+      input.value=''; renderLocalCatalog();
+      try { if(window.__tiSaveCatalogs) await Promise.race([window.__tiSaveCatalogs(cats), new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),6000))]); alert('Opción guardada en Firebase.'); }
+      catch(err) { alert('Opción guardada localmente. Firebase no respondió: '+err.message); }
+    }, true);
     function showModal(type){
       if(!modal || !fields) return;
       const labels = {presupuesto:'Nueva partida presupuestaria',pago:'Registrar pago',incidencia:'Nueva incidencia',activo:'Agregar activo'};
@@ -1912,9 +1929,9 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       const type = modal?.dataset.type || 'presupuesto';
       const key = type === 'pago' ? 'ti_pagos' : type === 'incidencia' ? 'ti_incidencias' : type === 'activo' ? 'ti_activos' : 'ti_presupuestos';
       const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-      const list = JSON.parse(localStorage.getItem(key) || '[]'); list.push({id:Date.now().toString(),...data,createdAt:new Date().toISOString()}); localStorage.setItem(key, JSON.stringify(list));
+      const list = JSON.parse(localStorage.getItem(key) || '[]'); list.unshift({id:Date.now().toString(),...data,createdAt:new Date().toISOString()}); localStorage.setItem(key, JSON.stringify(list));
       closeModal(); document.getElementById('toast').textContent='Registro guardado'; document.getElementById('toast').classList.add('show'); setTimeout(()=>document.getElementById('toast').classList.remove('show'),2200);
-      location.reload();
+      try { if (window.__tiAddRecord) await Promise.race([window.__tiAddRecord(type === 'pago' ? 'pagos' : type === 'incidencia' ? 'incidencias' : type === 'activo' ? 'activos' : 'presupuestos', data), new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),6000))]); document.getElementById('toast').textContent='Registro sincronizado con Firebase'; } catch(err) { document.getElementById('toast').textContent='Guardado local; Firebase no respondió'; }
     }, true);
     document.getElementById('exportBtn')?.addEventListener('click', e => {
       e.preventDefault(); e.stopImmediatePropagation();
