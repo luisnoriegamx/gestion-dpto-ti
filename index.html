@@ -276,6 +276,10 @@
             <div class="eyebrow" id="currentDateString">Cargando fecha...</div>
             <h2>Operación y Finanzas TI en Vivo</h2>
             <p>Métricas consolidadas, control de liquidez y diagnóstico predictivo.</p>
+            <div class="filters" style="margin-top:14px">
+              <select id="dashboardMonth" aria-label="Mes del dashboard"></select>
+              <select id="dashboardYear" aria-label="Año del dashboard"></select>
+            </div>
           </div>
         </div>
 
@@ -310,6 +314,16 @@
             <div class="kpi-top">Incidencias Abiertas <div class="kpi-icon">!</div></div>
             <strong id="kpiIncidenciasAct">0</strong>
             <span class="delta warn" id="kpiIncidenciasCrit">0 críticas</span>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-top">Presupuesto del Año <div class="kpi-icon">$</div></div>
+            <strong id="kpiPresupuestoYear">$0</strong>
+            <span class="delta" id="kpiPresupuestoYearCount">0 partidas</span>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-top">Gasto del Año <div class="kpi-icon">◔</div></div>
+            <strong id="kpiGastoYear">$0</strong>
+            <span class="delta" id="kpiGastoYearCount">0 pagos</span>
           </div>
         </div>
 
@@ -402,6 +416,8 @@
         <div class="card panel">
           <div class="filters">
             <input type="text" id="filterPresQuery" placeholder="Buscar proveedor, producto o concepto..." />
+            <select id="filterPresMonth" aria-label="Filtrar presupuesto por mes"></select>
+            <select id="filterPresYear" aria-label="Filtrar presupuesto por año"></select>
             <select id="filterPresCategoria"><option value="">Todas las categorías</option></select>
             <select id="filterPresUbicacion"><option value="">Todas las ubicaciones</option></select>
             <select id="filterPresClasificacion"><option value="">Todas las clasificaciones</option></select>
@@ -440,6 +456,8 @@
         <div class="card panel">
           <div class="filters">
             <input type="text" id="filterPagoQuery" placeholder="Buscar proveedor o concepto..." />
+            <select id="filterPagoMonth" aria-label="Filtrar gasto por mes"></select>
+            <select id="filterPagoYear" aria-label="Filtrar gasto por año"></select>
             <select id="filterPagoCategoria"><option value="">Todas las categorías</option></select>
             <select id="filterPagoEstado">
               <option value="">Todos los estados</option>
@@ -703,6 +721,18 @@
   let activeModalType = 'presupuesto';
 
   const fmtMoney = num => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(num || 0);
+  const monthsEs = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const recordDate = item => item.fechaPago || item.fecha || item.createdAt || '';
+  const dateParts = item => { const d = new Date(recordDate(item)); return isNaN(d) ? null : { month:d.getMonth()+1, year:d.getFullYear() }; };
+  const selectedPeriod = (monthId, yearId) => ({ month:Number(document.getElementById(monthId)?.value || 0), year:Number(document.getElementById(yearId)?.value || 0) });
+  const inPeriod = (item, period) => { const p=dateParts(item); return !p || ((!period.month || p.month===period.month) && (!period.year || p.year===period.year)); };
+  function populatePeriodSelectors(){
+    const yearIds=['dashboardYear','filterPresYear','filterPagoYear']; const years=new Set([new Date().getFullYear()]);
+    [...STORE.presupuestos,...STORE.pagos].forEach(x=>{const p=dateParts(x); if(p) years.add(p.year);});
+    const yearHtml='<option value="">Todos los años</option>'+[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+    yearIds.forEach(id=>{const el=document.getElementById(id); if(el&&!el.options.length){el.innerHTML=yearHtml; el.value=id==='dashboardYear'?new Date().getFullYear():'';}});
+    ['dashboardMonth','filterPresMonth','filterPagoMonth'].forEach(id=>{const el=document.getElementById(id); if(el&&!el.options.length){el.innerHTML='<option value="">Todos los meses</option>'+monthsEs.map((m,i)=>`<option value="${i+1}">${m}</option>`).join(''); if(id==='dashboardMonth') el.value=new Date().getMonth()+1;}});
+  }
   const showToast = msg => {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -918,15 +948,25 @@
 
   // CÁLCULOS GENERALES DE KPIS Y DASHBOARD
   function recalcKPIsAndDashboard() {
-    const totalPresupuesto = STORE.presupuestos.reduce((acc, p) => acc + (Number(p.costo) || 0), 0);
-    const totalGasto = STORE.pagos.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
+    populatePeriodSelectors();
+    const dashPeriod = selectedPeriod('dashboardMonth','dashboardYear');
+    const monthBudget = STORE.presupuestos.filter(p=>inPeriod(p,dashPeriod));
+    const monthPayments = STORE.pagos.filter(p=>inPeriod(p,dashPeriod));
+    const yearBudget = STORE.presupuestos.filter(p=>inPeriod(p,{month:0,year:dashPeriod.year}));
+    const yearPayments = STORE.pagos.filter(p=>inPeriod(p,{month:0,year:dashPeriod.year}));
+    const totalPresupuesto = monthBudget.reduce((acc, p) => acc + (Number(p.costo) || 0), 0);
+    const totalGasto = monthPayments.reduce((acc, p) => acc + (Number(p.monto) || 0), 0);
     
     document.getElementById('kpiPresupuestoTotal').textContent = fmtMoney(totalPresupuesto);
-    document.getElementById('kpiPresupuestoCount').textContent = `${STORE.presupuestos.length} partidas presupuestadas`;
+    document.getElementById('kpiPresupuestoCount').textContent = `${monthBudget.length} partidas del periodo`;
     document.getElementById('kpiGastoTotal').textContent = fmtMoney(totalGasto);
 
     const pct = totalPresupuesto > 0 ? ((totalGasto / totalPresupuesto) * 100).toFixed(1) : 0;
     document.getElementById('kpiPresupuestoPct').textContent = `${pct}% ejercido`;
+    document.getElementById('kpiPresupuestoYear').textContent = fmtMoney(yearBudget.reduce((a,p)=>a+(Number(p.costo)||0),0));
+    document.getElementById('kpiPresupuestoYearCount').textContent = `${yearBudget.length} partidas en ${dashPeriod.year}`;
+    document.getElementById('kpiGastoYear').textContent = fmtMoney(yearPayments.reduce((a,p)=>a+(Number(p.monto)||0),0));
+    document.getElementById('kpiGastoYearCount').textContent = `${yearPayments.length} pagos en ${dashPeriod.year}`;
 
     // Próximos Pagos (< 30 días)
     const now = new Date();
@@ -1026,6 +1066,7 @@
   function renderPresupuestos() {
     const q = (document.getElementById('filterPresQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPresCategoria').value;
+    const period = selectedPeriod('filterPresMonth','filterPresYear');
     const ubi = document.getElementById('filterPresUbicacion').value;
     const cla = document.getElementById('filterPresClasificacion').value;
 
@@ -1036,7 +1077,7 @@
       const matchCat = !cat || p.categoria === cat;
       const matchUbi = !ubi || p.ubicacion === ubi;
       const matchCla = !cla || p.clasificacion === cla;
-      return matchQ && matchCat && matchUbi && matchCla;
+      return matchQ && matchCat && matchUbi && matchCla && inPeriod(p, period);
     });
 
     const tbody = document.getElementById('presupuestosTableBody');
@@ -1075,12 +1116,13 @@
     const q = (document.getElementById('filterPagoQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPagoCategoria').value;
     const est = document.getElementById('filterPagoEstado').value;
+    const period = selectedPeriod('filterPagoMonth','filterPagoYear');
 
     const filtered = STORE.pagos.filter(p => {
       const matchQ = !q || (p.proveedor || '').toLowerCase().includes(q) || (p.concepto || '').toLowerCase().includes(q);
       const matchCat = !cat || p.categoria === cat;
       const matchEst = !est || p.estado === est;
-      return matchQ && matchCat && matchEst;
+      return matchQ && matchCat && matchEst && inPeriod(p, period);
     });
 
     const tbody = document.getElementById('pagosTableBody');
@@ -1679,10 +1721,10 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
   });
 
   // FILTROS EN TIEMPO REAL
-  ['filterPresQuery', 'filterPresCategoria', 'filterPresUbicacion', 'filterPresClasificacion'].forEach(id => {
+  ['filterPresQuery', 'filterPresCategoria', 'filterPresUbicacion', 'filterPresClasificacion', 'filterPresMonth', 'filterPresYear'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderPresupuestos);
   });
-  ['filterPagoQuery', 'filterPagoCategoria', 'filterPagoEstado'].forEach(id => {
+  ['filterPagoQuery', 'filterPagoCategoria', 'filterPagoEstado', 'filterPagoMonth', 'filterPagoYear'].forEach(id => {
     document.getElementById(id).addEventListener('input', renderPagos);
   });
   ['filterIncQuery', 'filterIncArea', 'filterIncPrioridad', 'filterIncEstado'].forEach(id => {
@@ -1811,6 +1853,7 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       if (status) { status.textContent = '○ Sesión no iniciada'; status.style.color = 'var(--red)'; } mirrorConnection();
     }
   });
+  ['dashboardMonth','dashboardYear'].forEach(id => document.getElementById(id)?.addEventListener('input', () => { recalcKPIsAndDashboard(); renderPresupuestos(); renderPagos(); }));
   window.__tiLogout = async (event) => {
     if (event) { event.preventDefault(); event.stopPropagation(); }
     await signOut(fallbackAuth);
