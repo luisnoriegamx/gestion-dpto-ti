@@ -607,6 +607,12 @@
               <input type="text" id="newCatalogItemInput" placeholder="Escribe el nombre de la nueva opción..." style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px" />
               <button class="primary" id="addCatalogItemBtn">+ Agregar</button>
             </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px">
+              <button class="ghost" type="button" id="downloadCatalogLayoutBtn">⇩ Descargar layout CSV</button>
+              <button class="ghost" type="button" id="uploadCatalogLayoutBtn">⇧ Cargar layout CSV</button>
+              <input type="file" id="catalogLayoutFile" accept=".csv,text/csv" hidden />
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:-6px 0 15px">El layout usa una columna llamada <b>opcion</b>. Puedes editarlo en Excel y cargarlo nuevamente.</p>
             <button class="ai-btn" id="suggestCatalogsBtn" type="button" onclick="window.suggestCatalogsFallback && window.suggestCatalogsFallback(event)" style="margin-bottom:15px">✨ Sugerir catálogos con IA</button>
 
             <div class="table-wrap">
@@ -1526,6 +1532,35 @@
       msg.style.color = 'var(--red)';
       msg.textContent = err.code === 'auth/email-already-in-use' ? 'Ese correo ya tiene una cuenta en Firebase.' : (err.message || 'No se pudo crear el usuario.');
     } finally { btn.disabled = false; }
+  });
+
+  const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  document.getElementById('downloadCatalogLayoutBtn')?.addEventListener('click', () => {
+    const key = document.getElementById('catalogSelector').value;
+    const items = STORE.catalogos[key] || [];
+    const csv = '\ufeffopcion\n' + items.map(csvCell).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `catalogo-${key}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+    showToast('Layout descargado');
+  });
+
+  document.getElementById('uploadCatalogLayoutBtn')?.addEventListener('click', () => document.getElementById('catalogLayoutFile')?.click());
+  document.getElementById('catalogLayoutFile')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0]; if (!file) return;
+    const key = document.getElementById('catalogSelector').value;
+    try {
+      const text = (await file.text()).replace(/^\ufeff/, '');
+      const rows = text.split(/\r?\n/).map(row => row.trim()).filter(Boolean);
+      const values = rows.slice(1).map(row => row.replace(/^"|"$/g, '').replace(/""/g, '"').trim()).filter(Boolean);
+      if (!values.length) throw new Error('El archivo no contiene opciones debajo del encabezado opcion.');
+      STORE.catalogos[key] = [...new Set([...(STORE.catalogos[key] || []), ...values])];
+      localStorage.setItem('ti_catalogos', JSON.stringify(STORE.catalogos));
+      if (!isLocalMode && db) await setDoc(doc(db, 'configuracion', 'catalogos'), STORE.catalogos, { merge: true });
+      renderCatalogTable(); populateAllDropdowns(); showToast(`${values.length} opciones cargadas y sincronizadas`);
+    } catch (err) { alert('No se pudo cargar el layout: ' + err.message); }
+    event.target.value = '';
   });
   window.openModal = openModal;
 
