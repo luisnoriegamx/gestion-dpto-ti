@@ -242,10 +242,7 @@
         <span>Activos TI</span>
       </button>
       <button data-view="catalogos">
-      <button data-view="catalogos">
         <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span>Catálogos & Opciones</span>
-      </button>
         <span>Catálogos & Opciones</span>
       </button>
       <button data-view="usuarios" id="usersNavBtn" hidden>
@@ -422,13 +419,9 @@
         </div>
         <div class="card panel">
           <div class="filters">
-          <div class="filters">
             <input type="text" id="filterPresQuery" placeholder="Buscar proveedor, producto o concepto..." />
             <select id="filterPresMonth" aria-label="Filtrar presupuesto por mes"></select>
             <select id="filterPresYear" aria-label="Filtrar presupuesto por año"></select>
-            <select id="filterPresCategoria"><option value="">Todas las categorías</option></select>
-            <select id="filterPresUbicacion"><option value="">Todas las ubicaciones</option></select>
-            <select id="filterPresClasificacion"><option value="">Todas las clasificaciones</option></select>
             <select id="filterPresCategoria"><option value="">Todas las categorías</option></select>
             <select id="filterPresUbicacion"><option value="">Todas las ubicaciones</option></select>
             <select id="filterPresClasificacion"><option value="">Todas las clasificaciones</option></select>
@@ -648,9 +641,6 @@
         </div>
       </div>
 
-    </section>
-      </div>
-
       <!-- 7. USUARIOS -->
       <div class="view" id="usuarios">
         <div class="module-head">
@@ -730,17 +720,13 @@
     appId: "1:221113269015:web:c576d33c0ecd304c271552"
   };
 
-  let app, db, auth;
-  let app, db, auth, userAdminAuth;
+  let firebaseApp, db, auth, userAdminAuth;
   let isLocalMode = false;
 
   try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
+    firebaseApp = initializeApp(firebaseConfig);
+    db = getFirestore(firebaseApp);
+    auth = getAuth(firebaseApp);
     userAdminAuth = getAuth(initializeApp(firebaseConfig, 'user-admin'));
   } catch (err) {
     console.warn("Error inicializando Firebase:", err);
@@ -801,8 +787,6 @@
     proveedores: 'Control de Pagos Realizados',
     incidencias: 'Gestión de Incidencias',
     activos: 'Inventario de Activos TI',
-    catalogos: 'Catálogos y Configuración de Listas'
-    activos: 'Inventario de Activos TI',
     catalogos: 'Catálogos y Configuración de Listas',
     usuarios: 'Administración de Usuarios'
   };
@@ -824,9 +808,7 @@
   const syncStatus = document.getElementById('syncStatus');
 
   function unlockUI(userEmail, local = false) {
-  function unlockUI(userEmail, local = false) {
     isLocalMode = local;
-    authGate.style.display = 'none';
     authGate.style.display = 'none';
     const isAdmin = String(userEmail || '').toLowerCase() === 'lnoriega@mileniumgasolineras.com';
     const usersNavBtn = document.getElementById('usersNavBtn');
@@ -979,8 +961,6 @@
   // SUSCRIPCIONES A FIRESTORE
   function initRealtime() {
     initCatalogs();
-  function initRealtime() {
-    initCatalogs();
     loadPortalUsers();
 
     onSnapshot(collection(db, 'presupuestos'), snap => {
@@ -1092,11 +1072,11 @@
       upcoming.sort((a,b) => a.diff - b.diff);
       dashUpcomingTbody.innerHTML = upcoming.slice(0, 5).map(u => {
         const badge = u.diff <= 3 ? 'status danger' : u.diff <= 7 ? 'status warn' : 'status info';
-        const label = u.diff < 0 ? 'Venció' : (u.diff === 0 ? 'Hoy' : `En ${u.diff} d`);
+        const dueLabel = u.diff < 0 ? 'Venció' : (u.diff === 0 ? 'Hoy' : `En ${u.diff} d`);
         return `
           <tr>
             <td><b>${u.proveedor || ''}</b><br><small style="color:var(--muted)">${u.producto || ''}</small></td>
-            <td><span class="${badge}">${label} (${u.fechaPago})</span></td>
+            <td><span class="${badge}">${dueLabel} (${u.fechaPago})</span></td>
             <td><b>${fmtMoney(u.costo)}</b></td>
           </tr>
         `;
@@ -1126,7 +1106,6 @@
 
   // RENDERIZADO: PRESUPUESTOS
   function renderPresupuestos() {
-  function renderPresupuestos() {
     const q = (document.getElementById('filterPresQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPresCategoria').value;
     const period = selectedPeriod('filterPresMonth','filterPresYear');
@@ -1143,7 +1122,6 @@
       return matchQ && matchCat && matchUbi && matchCla && inPeriod(p, period);
     });
 
-    const tbody = document.getElementById('presupuestosTableBody');
     const tbody = document.getElementById('presupuestosTableBody');
     const templateSelect = document.getElementById('budgetTemplateSelect');
     if (templateSelect) {
@@ -1174,7 +1152,6 @@
         <td><b>${p.fechaPago || 'Pendiente'}</b></td>
         <td><b style="color:var(--orange)">${fmtMoney(p.costo)}</b></td>
         <td style="text-align:right">
-          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.payBudgetDirectly('${p.id}')">Pagar</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}')">Duplicar</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}', true)">+ Mes</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.payBudgetDirectly('${p.id}')">Pagar</button>
@@ -1375,8 +1352,6 @@
           <div class="field-with-config"><select name="proveedor" required>${buildOptionsHtml(STORE.catalogos.proveedores)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('proveedores')">+</button></div>
         </label>
         <label>Producto o Servicio *
-          <input name="producto" required placeholder="Ej. Licenciamiento M365, Servidor PowerEdge, Enlace Dedicado" />
-        <label>Producto o Servicio *
           <div class="field-with-config"><select name="producto" required><option value="">Selecciona un producto o servicio</option>${buildOptionsHtml(STORE.catalogos.productos)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('productos')">+</button></div>
         </label>
         <label>Concepto / Detalle de la Partida *
@@ -1500,7 +1475,6 @@
     return '';
   }
 
-  function openModal(type) {
   function openModal(type, prefill = null) {
     activeModalType = type;
     const modalTitles = {
@@ -1510,8 +1484,6 @@
       activo: 'Registrar Activo Tecnológico'
     };
     modalTitle.textContent = modalTitles[type] || 'Registrar Movimiento';
-    formFields.innerHTML = getFormHtml(type);
-    modal.classList.add('show');
     formFields.innerHTML = getFormHtml(type);
     modal.classList.add('show');
     if (prefill) {
@@ -1578,7 +1550,6 @@
     renderCatalogTable();
   };
 
-  document.querySelectorAll('[data-open]').forEach(btn => {
   document.querySelectorAll('[data-open]').forEach(btn => {
     btn.addEventListener('click', () => openModal(btn.dataset.open));
   });
@@ -2002,9 +1973,8 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
   };
 
   window.quickAddCatalog = async catKey => {
-    const label = catKey === 'proveedores' ? 'proveedor' : catKey === 'conceptos' ? 'concepto' : 'opción';
-    const label = catKey === 'proveedores' ? 'proveedor' : catKey === 'productos' ? 'producto o servicio' : catKey === 'conceptos' ? 'concepto' : 'opción';
-    const value = prompt(`Escribe el nuevo ${label}:`);
+    const catalogLabel = catKey === 'proveedores' ? 'proveedor' : catKey === 'productos' ? 'producto o servicio' : catKey === 'conceptos' ? 'concepto' : 'opción';
+    const value = prompt(`Escribe el nuevo ${catalogLabel}:`);
     if (!value || !value.trim()) return;
     const clean = value.trim();
     STORE.catalogos[catKey] = STORE.catalogos[catKey] || [];
@@ -2084,7 +2054,6 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       const opts = key => (cats[key] || []).map(x => `<option value="${x}">${x}</option>`).join('');
       if(type === 'presupuesto' || type === 'pago') {
         const productField = type === 'presupuesto' ? `<label>Producto o Servicio *<select name="producto" required><option value="">Selecciona un producto o servicio</option>${opts('productos')}</select></label>` : '';
-        fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label><label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
         fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label>${productField}<label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
       } else if(type === 'incidencia') {
         fields.innerHTML = `<label>Asunto / Falla detectada *<input name="asunto" required></label><label>Área Responsable *<select name="area" required><option value="">Selecciona un área</option>${opts('areas')}</select></label><label>Prioridad *<select name="prioridad"><option>Media</option><option>Alta</option><option>Crítica</option><option>Baja</option></select></label><label>Responsable<input name="responsable"></label><label>Notas de diagnóstico<textarea name="notas" required></textarea></label><button type="button" class="ai-btn" id="suggestIncidentBtn">✨ Sugerir clasificación y respuesta con IA</button>`;
