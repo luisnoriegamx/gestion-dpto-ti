@@ -762,6 +762,7 @@
   STORE.catalogos.conceptos ||= ["Renovación de licencias", "Suscripción mensual", "Mantenimiento preventivo", "Soporte técnico", "Compra de equipo", "Conectividad / enlace", "Seguridad informática"];
 
   let activeModalType = 'presupuesto';
+  let editingRecordId = null;
 
   const fmtMoney = num => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(num || 0);
   const monthsEs = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1158,6 +1159,7 @@
         <td><b>${p.fechaPago || 'Pendiente'}</b></td>
         <td><b style="color:var(--orange)">${fmtMoney(p.costo)}</b></td>
         <td style="text-align:right">
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.editRecord('presupuestos','${p.id}')">Editar</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}')">Duplicar</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}', true)">+ Mes</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.payBudgetDirectly('${p.id}')">Pagar</button>
@@ -1196,7 +1198,7 @@
         <td><b>${fmtMoney(p.monto)}</b></td>
         <td><span class="status ok">${p.estado || 'Pagado'}</span></td>
         <td style="text-align:right">
-          <button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('pagos', '${p.id}')">Borrar</button>
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.editRecord('pagos','${p.id}')">Editar</button><button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('pagos', '${p.id}')">Borrar</button>
         </td>
       </tr>
     `).join('');
@@ -1236,7 +1238,7 @@
           <td>${i.createdAt ? new Date(i.createdAt).toLocaleDateString('es-MX') : '-'}</td>
           <td style="text-align:right">
             ${i.estado !== 'Resuelta' ? `<button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.toggleResolveIncident('${i.id}')">Resolver</button>` : ''}
-            <button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('incidencias', '${i.id}')">Borrar</button>
+            <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.editRecord('incidencias','${i.id}')">Editar</button><button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('incidencias', '${i.id}')">Borrar</button>
           </td>
         </tr>
       `;
@@ -1271,7 +1273,7 @@
         <td>${a.ubicacion || 'Almacén'}</td>
         <td><span class="status ok">${a.estado || 'Activo'}</span></td>
         <td style="text-align:right">
-          <button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('activos', '${a.id}')">Borrar</button>
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.editRecord('activos','${a.id}')">Editar</button><button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('activos', '${a.id}')">Borrar</button>
         </td>
       </tr>
     `).join('');
@@ -1483,17 +1485,19 @@
 
   function openModal(type, prefill = null) {
     activeModalType = type;
+    editingRecordId = prefill?._editingId || null;
     const modalTitles = {
       presupuesto: 'Registrar Partida de Presupuesto',
       pago: 'Registrar Pago / Factura',
       incidencia: 'Levantar Ticket de Incidencia',
       activo: 'Registrar Activo Tecnológico'
     };
-    modalTitle.textContent = modalTitles[type] || 'Registrar Movimiento';
+    modalTitle.textContent = prefill?._editingId ? `Editar ${type === 'presupuesto' ? 'partida de presupuesto' : type === 'pago' ? 'pago' : type === 'incidencia' ? 'incidencia' : 'activo'}` : (modalTitles[type] || 'Registrar Movimiento');
     formFields.innerHTML = getFormHtml(type);
     modal.classList.add('show');
     if (prefill) {
       Object.entries(prefill).forEach(([key, value]) => {
+        if (key === '_editingId') return;
         const field = formFields.querySelector(`[name="${key}"]`);
         if (field && value !== undefined && value !== null) field.value = value;
       });
@@ -1564,6 +1568,13 @@
   });
   window.openModal = openModal;
 
+  window.editRecord = (collectionName, id) => {
+    const type = collectionName === 'presupuestos' ? 'presupuesto' : collectionName === 'pagos' ? 'pago' : collectionName === 'incidencias' ? 'incidencia' : 'activo';
+    const record = STORE[collectionName]?.find(item => item.id === id);
+    if (!record) return;
+    openModal(type, { ...record, _editingId: id });
+  };
+
   window.cloneBudget = (id, nextMonth = false) => {
     const source = STORE.presupuestos.find(p => p.id === id);
     if (!source) return;
@@ -1609,7 +1620,8 @@
     if (data.monto) data.monto = parseFloat(data.monto) || 0;
     if (activeModalType === 'incidencia') data.estado = data.estado || 'Abierta';
     data.updatedAt = new Date().toISOString();
-    data.id = 'loc_' + Date.now();
+    const recordId = editingRecordId;
+    if (!recordId) data.id = 'loc_' + Date.now();
 
     const targetCollection = activeModalType === 'presupuesto' ? 'presupuestos'
       : activeModalType === 'pago' ? 'pagos'
@@ -1617,21 +1629,23 @@
 
     try {
       if (!isLocalMode && db) {
-        await addDoc(collection(db, targetCollection), {
-          ...data,
-          createdAt: new Date().toISOString()
-        });
+        if (recordId) await updateDoc(doc(db, targetCollection, recordId), data);
+        else await addDoc(collection(db, targetCollection), { ...data, createdAt: new Date().toISOString() });
       } else {
-        STORE[targetCollection].unshift({ ...data, createdAt: new Date().toISOString() });
+        if (recordId) {
+          const index = STORE[targetCollection].findIndex(item => item.id === recordId);
+          if (index >= 0) STORE[targetCollection][index] = { ...STORE[targetCollection][index], ...data, id: recordId };
+        } else STORE[targetCollection].unshift({ ...data, createdAt: new Date().toISOString() });
         saveLocalData(targetCollection);
         if (targetCollection === 'presupuestos') renderPresupuestos();
         if (targetCollection === 'pagos') renderPagos();
         if (targetCollection === 'incidencias') renderIncidencias();
         if (targetCollection === 'activos') renderActivos();
       }
-      showToast('Registro guardado con éxito');
+      showToast(recordId ? 'Registro actualizado con éxito' : 'Registro guardado con éxito');
       closeModal();
       e.target.reset();
+      editingRecordId = null;
     } catch (err) {
       alert('Error: ' + err.message);
     } finally {
