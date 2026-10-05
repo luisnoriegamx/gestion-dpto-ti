@@ -415,12 +415,18 @@
         </div>
         <div class="card panel">
           <div class="filters">
+          <div class="filters">
             <input type="text" id="filterPresQuery" placeholder="Buscar proveedor, producto o concepto..." />
             <select id="filterPresMonth" aria-label="Filtrar presupuesto por mes"></select>
             <select id="filterPresYear" aria-label="Filtrar presupuesto por año"></select>
             <select id="filterPresCategoria"><option value="">Todas las categorías</option></select>
             <select id="filterPresUbicacion"><option value="">Todas las ubicaciones</option></select>
             <select id="filterPresClasificacion"><option value="">Todas las clasificaciones</option></select>
+            <select id="filterPresCategoria"><option value="">Todas las categorías</option></select>
+            <select id="filterPresUbicacion"><option value="">Todas las ubicaciones</option></select>
+            <select id="filterPresClasificacion"><option value="">Todas las clasificaciones</option></select>
+            <select id="budgetTemplateSelect" aria-label="Seleccionar partida del historial"><option value="">Reutilizar partida del historial...</option></select>
+            <button class="ghost" type="button" id="loadBudgetTemplateBtn">Cargar plantilla</button>
           </div>
           <div class="table-wrap" style="margin-top:18px">
             <table class="table">
@@ -589,6 +595,7 @@
                 <option value="categorias">Categorías de Presupuesto y Pago</option>
                 <option value="proveedores">Proveedores</option>
                 <option value="conceptos">Conceptos de gasto</option>
+                <option value="productos">Productos y servicios TI</option>
                 <option value="ubicaciones">Ubicaciones del Servicio</option>
                 <option value="clasificaciones">Clasificación Contable/Operativa</option>
                 <option value="areas">Áreas de Soporte TI</option>
@@ -706,6 +713,7 @@
     catalogos: JSON.parse(localStorage.getItem('ti_catalogos') || JSON.stringify({
       categorias: ["Servicios Cloud", "Licencias & Software", "Equipamiento & Hardware", "Soporte Externo & Consultoría", "Telecomunicaciones & Enlaces"],
       proveedores: ["Microsoft", "Google Workspace", "AWS", "Telmex / Totalplay", "Dell", "Soporte externo"],
+      productos: ["Microsoft 365", "Licencias de Windows", "Equipo de cómputo", "Servidor / almacenamiento", "Firewall / seguridad", "Enlace de internet", "Telefonía", "Respaldo y recuperación"],
       conceptos: ["Renovación de licencias", "Suscripción mensual", "Mantenimiento preventivo", "Soporte técnico", "Compra de equipo", "Conectividad / enlace", "Seguridad informática"],
       ubicaciones: ["Estación Matriz", "Sucursal Norte", "Sucursal Reynosa", "Sucursal Cosmópolis", "Site Central / Data Center"],
       clasificaciones: ["Gasto Operativo (OPEX)", "Inversión de Capital (CAPEX)", "Renovación Anual", "Mantenimiento Preventivo"],
@@ -716,6 +724,7 @@
 
   // Compatibilidad con catálogos creados en versiones anteriores.
   STORE.catalogos.proveedores ||= ["Microsoft", "Google Workspace", "AWS", "Telmex / Totalplay", "Dell", "Soporte externo"];
+  STORE.catalogos.productos ||= ["Microsoft 365", "Licencias de Windows", "Equipo de cómputo", "Servidor / almacenamiento", "Firewall / seguridad", "Enlace de internet", "Telefonía", "Respaldo y recuperación"];
   STORE.catalogos.conceptos ||= ["Renovación de licencias", "Suscripción mensual", "Mantenimiento preventivo", "Soporte técnico", "Compra de equipo", "Conectividad / enlace", "Seguridad informática"];
 
   let activeModalType = 'presupuesto';
@@ -1064,6 +1073,7 @@
 
   // RENDERIZADO: PRESUPUESTOS
   function renderPresupuestos() {
+  function renderPresupuestos() {
     const q = (document.getElementById('filterPresQuery').value || '').toLowerCase();
     const cat = document.getElementById('filterPresCategoria').value;
     const period = selectedPeriod('filterPresMonth','filterPresYear');
@@ -1081,6 +1091,13 @@
     });
 
     const tbody = document.getElementById('presupuestosTableBody');
+    const tbody = document.getElementById('presupuestosTableBody');
+    const templateSelect = document.getElementById('budgetTemplateSelect');
+    if (templateSelect) {
+      const current = templateSelect.value;
+      templateSelect.innerHTML = '<option value="">Reutilizar partida del historial...</option>' + STORE.presupuestos.map(p => `<option value="${p.id}">${p.fechaPago || 'Sin fecha'} · ${p.proveedor || 'Sin proveedor'} · ${p.producto || p.concepto || 'Partida'}</option>`).join('');
+      if (STORE.presupuestos.some(p => p.id === current)) templateSelect.value = current;
+    }
     if (filtered.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8"><div class="empty">No se encontraron partidas con los filtros especificados.</div></td></tr>';
       return;
@@ -1104,6 +1121,9 @@
         <td><b>${p.fechaPago || 'Pendiente'}</b></td>
         <td><b style="color:var(--orange)">${fmtMoney(p.costo)}</b></td>
         <td style="text-align:right">
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.payBudgetDirectly('${p.id}')">Pagar</button>
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}')">Duplicar</button>
+          <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.cloneBudget('${p.id}', true)">+ Mes</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="window.payBudgetDirectly('${p.id}')">Pagar</button>
           <button class="ghost danger" style="padding:4px 8px;font-size:11px" onclick="window.deleteRecord('presupuestos', '${p.id}')">Borrar</button>
         </td>
@@ -1303,6 +1323,8 @@
         </label>
         <label>Producto o Servicio *
           <input name="producto" required placeholder="Ej. Licenciamiento M365, Servidor PowerEdge, Enlace Dedicado" />
+        <label>Producto o Servicio *
+          <div class="field-with-config"><select name="producto" required><option value="">Selecciona un producto o servicio</option>${buildOptionsHtml(STORE.catalogos.productos)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('productos')">+</button></div>
         </label>
         <label>Concepto / Detalle de la Partida *
           <div class="field-with-config"><select name="concepto" required>${buildOptionsHtml(STORE.catalogos.conceptos)}</select><button type="button" class="btn-config-field" onclick="window.quickAddCatalog('conceptos')">+</button></div>
@@ -1426,6 +1448,7 @@
   }
 
   function openModal(type) {
+  function openModal(type, prefill = null) {
     activeModalType = type;
     const modalTitles = {
       presupuesto: 'Registrar Partida de Presupuesto',
@@ -1436,9 +1459,31 @@
     modalTitle.textContent = modalTitles[type] || 'Registrar Movimiento';
     formFields.innerHTML = getFormHtml(type);
     modal.classList.add('show');
+    formFields.innerHTML = getFormHtml(type);
+    modal.classList.add('show');
+    if (prefill) {
+      Object.entries(prefill).forEach(([key, value]) => {
+        const field = formFields.querySelector(`[name="${key}"]`);
+        if (field && value !== undefined && value !== null) field.value = value;
+      });
+    }
     setTimeout(() => modal.querySelector('input')?.focus(), 50);
   }
   window.openModal = openModal;
+
+  window.cloneBudget = (id, nextMonth = false) => {
+    const source = STORE.presupuestos.find(p => p.id === id);
+    if (!source) return;
+    const clone = { ...source };
+    delete clone.id; delete clone.createdAt; delete clone.updatedAt;
+    if (nextMonth && clone.fechaPago) {
+      const d = new Date(`${clone.fechaPago}T12:00:00`);
+      d.setMonth(d.getMonth() + 1);
+      clone.fechaPago = d.toISOString().slice(0, 10);
+    }
+    openModal('presupuesto', clone);
+    showToast(nextMonth ? 'Plantilla del siguiente mes cargada; revisa la fecha y guarda' : 'Partida clonada; revisa los datos y guarda');
+  };
 
   window.quickConfigCatalog = catKey => {
     closeModal();
@@ -1447,6 +1492,7 @@
     renderCatalogTable();
   };
 
+  document.querySelectorAll('[data-open]').forEach(btn => {
   document.querySelectorAll('[data-open]').forEach(btn => {
     btn.addEventListener('click', () => openModal(btn.dataset.open));
   });
@@ -1609,6 +1655,12 @@
       populateAllDropdowns(); renderCatalogTable(); showToast('Catálogos sugeridos y sincronizados con Firebase');
     } catch (err) { alert('No se pudieron generar sugerencias: ' + err.message); }
     finally { btn.disabled = false; btn.textContent = '✨ Sugerir catálogos con IA'; }
+  });
+
+  document.getElementById('loadBudgetTemplateBtn')?.addEventListener('click', () => {
+    const id = document.getElementById('budgetTemplateSelect')?.value;
+    if (!id) { showToast('Selecciona una partida del historial'); return; }
+    window.cloneBudget(id, true);
   });
 
   document.addEventListener('click', async event => {
@@ -1865,6 +1917,7 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
 
   window.quickAddCatalog = async catKey => {
     const label = catKey === 'proveedores' ? 'proveedor' : catKey === 'conceptos' ? 'concepto' : 'opción';
+    const label = catKey === 'proveedores' ? 'proveedor' : catKey === 'productos' ? 'producto o servicio' : catKey === 'conceptos' ? 'concepto' : 'opción';
     const value = prompt(`Escribe el nuevo ${label}:`);
     if (!value || !value.trim()) return;
     const clean = value.trim();
@@ -1944,7 +1997,9 @@ Entrega un resumen ejecutivo estructurado en HTML limpio (usa <ul>, <li>, <b>, s
       const cats = JSON.parse(localStorage.getItem('ti_catalogos') || '{}');
       const opts = key => (cats[key] || []).map(x => `<option value="${x}">${x}</option>`).join('');
       if(type === 'presupuesto' || type === 'pago') {
+        const productField = type === 'presupuesto' ? `<label>Producto o Servicio *<select name="producto" required><option value="">Selecciona un producto o servicio</option>${opts('productos')}</select></label>` : '';
         fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label><label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
+        fields.innerHTML = `<label>Proveedor *<select name="proveedor" required><option value="">Selecciona un proveedor</option>${opts('proveedores')}</select></label>${productField}<label>Concepto *<select name="concepto" required><option value="">Selecciona un concepto</option>${opts('conceptos')}</select></label><label>Categoría *<select name="categoria" required><option value="">Selecciona una categoría</option>${opts('categorias')}</select></label><label>Monto *<input name="${type==='pago'?'monto':'costo'}" type="number" step="0.01" required></label><label>Fecha *<input name="${type==='pago'?'fecha':'fechaPago'}" type="date" required></label>`;
       } else if(type === 'incidencia') {
         fields.innerHTML = `<label>Asunto / Falla detectada *<input name="asunto" required></label><label>Área Responsable *<select name="area" required><option value="">Selecciona un área</option>${opts('areas')}</select></label><label>Prioridad *<select name="prioridad"><option>Media</option><option>Alta</option><option>Crítica</option><option>Baja</option></select></label><label>Responsable<input name="responsable"></label><label>Notas de diagnóstico<textarea name="notas" required></textarea></label><button type="button" class="ai-btn" id="suggestIncidentBtn">✨ Sugerir clasificación y respuesta con IA</button>`;
       } else {
