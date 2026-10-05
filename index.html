@@ -242,8 +242,15 @@
         <span>Activos TI</span>
       </button>
       <button data-view="catalogos">
+      <button data-view="catalogos">
         <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         <span>Catálogos & Opciones</span>
+      </button>
+        <span>Catálogos & Opciones</span>
+      </button>
+      <button data-view="usuarios" id="usersNavBtn" hidden>
+        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Usuarios</span>
       </button>
     </nav>
     <div class="side-note">
@@ -642,6 +649,36 @@
       </div>
 
     </section>
+      </div>
+
+      <!-- 7. USUARIOS -->
+      <div class="view" id="usuarios">
+        <div class="module-head">
+          <div>
+            <div class="eyebrow">Administración de Accesos</div>
+            <h2>Usuarios del Portal</h2>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="card panel">
+            <div class="panel-head"><div><h3>Dar de alta usuario</h3><div class="panel-sub">Crea el acceso directamente en Firebase Authentication.</div></div></div>
+            <form id="createUserForm" class="form">
+              <label>Nombre del usuario *<input id="newUserName" required placeholder="Ej. Juan Pérez"></label>
+              <label>Correo electrónico *<input id="newUserEmail" type="email" required placeholder="usuario@empresa.com"></label>
+              <label>Contraseña temporal *<input id="newUserPassword" type="password" minlength="6" required placeholder="Mínimo 6 caracteres"></label>
+              <label>Rol<select id="newUserRole"><option>Usuario</option><option>Administrador</option><option>Consulta</option></select></label>
+              <button class="primary" type="submit" id="createUserBtn">+ Crear usuario</button>
+              <div id="createUserMsg" style="font-size:12px;line-height:1.4"></div>
+            </form>
+          </div>
+          <div class="card panel">
+            <div class="panel-head"><div><h3>Accesos registrados</h3><div class="panel-sub">Directorio operativo del portal.</div></div></div>
+            <div class="table-wrap"><table class="table"><thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th></tr></thead><tbody id="usersTableBody"><tr><td colspan="3"><div class="empty">Aún no hay usuarios registrados en el directorio.</div></td></tr></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
   </main>
 </div>
 
@@ -694,12 +731,17 @@
   };
 
   let app, db, auth;
+  let app, db, auth, userAdminAuth;
   let isLocalMode = false;
 
   try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    userAdminAuth = getAuth(initializeApp(firebaseConfig, 'user-admin'));
   } catch (err) {
     console.warn("Error inicializando Firebase:", err);
   }
@@ -760,6 +802,9 @@
     incidencias: 'Gestión de Incidencias',
     activos: 'Inventario de Activos TI',
     catalogos: 'Catálogos y Configuración de Listas'
+    activos: 'Inventario de Activos TI',
+    catalogos: 'Catálogos y Configuración de Listas',
+    usuarios: 'Administración de Usuarios'
   };
 
   function switchView(viewId) {
@@ -779,8 +824,13 @@
   const syncStatus = document.getElementById('syncStatus');
 
   function unlockUI(userEmail, local = false) {
+  function unlockUI(userEmail, local = false) {
     isLocalMode = local;
     authGate.style.display = 'none';
+    authGate.style.display = 'none';
+    const isAdmin = String(userEmail || '').toLowerCase() === 'lnoriega@mileniumgasolineras.com';
+    const usersNavBtn = document.getElementById('usersNavBtn');
+    if (usersNavBtn) usersNavBtn.hidden = !isAdmin;
     if (local) {
       syncStatus.innerHTML = '● Modo Local / Offline (<b>' + userEmail + '</b>)';
       syncStatus.style.color = 'var(--yellow)';
@@ -929,6 +979,9 @@
   // SUSCRIPCIONES A FIRESTORE
   function initRealtime() {
     initCatalogs();
+  function initRealtime() {
+    initCatalogs();
+    loadPortalUsers();
 
     onSnapshot(collection(db, 'presupuestos'), snap => {
       STORE.presupuestos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1469,6 +1522,39 @@
     }
     setTimeout(() => modal.querySelector('input')?.focus(), 50);
   }
+
+  async function loadPortalUsers() {
+    const body = document.getElementById('usersTableBody');
+    if (!body || !db) return;
+    try {
+      onSnapshot(collection(db, 'usuarios'), snap => {
+        const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        body.innerHTML = users.length ? users.map(u => `<tr><td><b>${u.nombre || 'Sin nombre'}</b></td><td>${u.email || '-'}</td><td><span class="status info">${u.rol || 'Usuario'}</span></td></tr>`).join('') : '<tr><td colspan="3"><div class="empty">Aún no hay usuarios registrados en el directorio.</div></td></tr>';
+      }, () => { body.innerHTML = '<tr><td colspan="3"><div class="empty">No se pudo cargar el directorio. Verifica las reglas de Firestore.</div></td></tr>'; });
+    } catch (err) { console.warn('No se pudo cargar usuarios:', err); }
+  }
+
+  document.getElementById('createUserForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('createUserMsg');
+    const btn = document.getElementById('createUserBtn');
+    const nombre = document.getElementById('newUserName').value.trim();
+    const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
+    const password = document.getElementById('newUserPassword').value;
+    const rol = document.getElementById('newUserRole').value;
+    btn.disabled = true; msg.style.color = 'var(--blue)'; msg.textContent = 'Creando usuario en Firebase...';
+    try {
+      if (!userAdminAuth || !db) throw new Error('Firebase no está disponible.');
+      const credential = await createUserWithEmailAndPassword(userAdminAuth, email, password);
+      await setDoc(doc(db, 'usuarios', credential.user.uid), { nombre, email, rol, activo: true, createdAt: new Date().toISOString(), createdBy: auth?.currentUser?.email || '' });
+      await signOut(userAdminAuth);
+      msg.style.color = 'var(--green)'; msg.textContent = 'Usuario creado correctamente y agregado al directorio.';
+      e.target.reset();
+    } catch (err) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = err.code === 'auth/email-already-in-use' ? 'Ese correo ya tiene una cuenta en Firebase.' : (err.message || 'No se pudo crear el usuario.');
+    } finally { btn.disabled = false; }
+  });
   window.openModal = openModal;
 
   window.cloneBudget = (id, nextMonth = false) => {
